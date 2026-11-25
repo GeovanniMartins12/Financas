@@ -1,3 +1,4 @@
+# Servidor do app Finanças (publicado automaticamente pelo GitHub Actions)
 name = "financas"
 main = "src/index.js"
 compatibility_date = "2025-06-01"
