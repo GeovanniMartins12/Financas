@@ -1,6 +1,6 @@
 // Service worker: funcionamento offline + notificações cifradas.
-const V='financas-v2';
-const FILES=['./','index.html','manifest.webmanifest','icon-180.png','icon-192.png','icon-512.png'];
+const V='financas-v3';
+const FILES=['./','index.html','manifest.webmanifest','icon-ms-180.png','icon-ms-192.png','icon-ms-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(V).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==V).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 self.addEventListener('fetch',e=>{
@@ -23,5 +23,5 @@ async function decode(data){
     if(d.iv&&d.c){const k=await getKey();if(k&&k.enc){const p=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64u(d.iv),additionalData:new TextEncoder().encode('sched')},k.enc,unb64u(d.c));const m=JSON.parse(new TextDecoder().decode(p));title=m.title||title;body=m.body||body}}
     else if(d.title){title=d.title;body=d.body||''}}catch(e){}
   return{title,body}}
-self.addEventListener('push',e=>{e.waitUntil(decode(e.data).then(m=>self.registration.showNotification(m.title,{body:m.body,icon:'icon-192.png',badge:'icon-192.png',tag:'financas',renotify:true,data:{url:'./'}})))});
+self.addEventListener('push',e=>{e.waitUntil(decode(e.data).then(m=>self.registration.showNotification(m.title,{body:m.body,icon:'icon-ms-192.png',badge:'icon-ms-192.png',tag:'financas',renotify:true,data:{url:'./'}})))});
 self.addEventListener('notificationclick',e=>{e.notification.close();e.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(ws=>{for(const w of ws){if('focus' in w)return w.focus()}return clients.openWindow('./')}))});
