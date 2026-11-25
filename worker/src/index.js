@@ -196,7 +196,10 @@ export default {
         for (const d of docs) {
           if (!d || !isB64u(d.id, 64) || typeof d.u !== 'number' || !isB64u(d.iv, 32) || !isB64u(d.c, MAX_DOC)) continue;
           const cur = all[d.id];
-          if (!cur || d.u >= cur.u) { all[d.id] = { u: d.u, iv: d.iv, c: d.c }; changed = true }
+          // Controle de versão: o app informa a versão que viu por último (base).
+          // Se outro aparelho gravou antes, recusa; o app baixa, mescla e reenvia.
+          const ok = ('base' in d) ? (cur ? d.base === cur.u : d.base == null) : (!cur || d.u >= cur.u);
+          if (ok) { all[d.id] = { u: d.u, iv: d.iv, c: d.c }; changed = true }
           out[d.id] = { u: all[d.id].u };
         }
         if (changed) {

@@ -141,6 +141,23 @@ nav button[aria-current=page]{color:var(--ink);font-weight:600}
 .hint{font-size:14px;color:var(--mute);margin:0 0 12px}
 .hint.bad{color:var(--neg)}
 textarea{width:100%;height:40vh;font:13px ui-monospace,monospace;border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--card);color:var(--ink)}
+#lock{position:fixed;inset:0;z-index:50;background:#0b0b0b;color:#f4f4f4;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px}
+#lock[hidden]{display:none}
+.lk{width:100%;max-width:340px;display:grid;gap:12px;justify-items:center}
+.lk img{border-radius:20px}.lk h2{margin:6px 0 0;font-size:26px}
+.lk .btn{width:100%}.btn.gold{background:linear-gradient(135deg,#ffe278,#e8aa28 55%,#a05f0a);color:#0b0b0b}
+.btn.lkghost{background:#1d1d1d;color:#f4f4f4}
+#lkform{display:grid;gap:10px;width:100%}#lkform[hidden]{display:none}#lkform input{background:#151515;color:#fff;border-color:#333}
+#lockmsg{min-height:20px;font-size:14px;color:#ffb3ad;margin:0}
+body.cover>*:not(#lock){filter:blur(24px)}
+.fc{background:var(--card);border-radius:20px;padding:18px 18px 14px;margin:0 0 18px}
+.fc .fbig{font:700 clamp(26px,8vw,32px) "Space Grotesk",Inter,sans-serif;margin:2px 0 6px;white-space:nowrap}
+.fc p{margin:4px 0}.fc ul{list-style:none;margin:10px 0 0;padding:0;border-top:1px solid var(--line)}
+.fc li{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:15px}
+.fc li span:nth-child(2){flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fc li b{font-family:"Space Grotesk",Inter,sans-serif;white-space:nowrap}
+.linkbtn{background:none;border:0;padding:8px 0 0;color:var(--ink);font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+ol.steps{padding-left:20px;margin:0 0 12px}ol.steps li{margin:0 0 10px}
+code.u{display:block;background:var(--card);border-radius:10px;padding:10px;font-size:13px;overflow-wrap:anywhere}
 #toast{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;z-index:30;max-width:90vw;opacity:0;pointer-events:none;transition:opacity .2s}
 #toast.on{opacity:1}
 @media(prefers-reduced-motion:reduce){#toast{transition:none}}
@@ -171,6 +188,10 @@ textarea{width:100%;height:40vh;font:13px ui-monospace,monospace;border:1px soli
 </div></nav>
 <div id="sheet" hidden><div class="sh" role="dialog" aria-modal="true"></div></div>
 <div id="ask" hidden><div class="sh" role="alertdialog" aria-modal="true"><p style="font-size:17px;margin:4px 0 0"></p><div class="row"><button class="btn ghost" data-no>Cancelar</button><button class="btn" data-ok>Confirmar</button></div></div></div>
+<div id="lock" hidden><div class="lk"><img src="icon-ms-192.png" alt="" width="84" height="84"><h2>Finanças</h2><p class="hint" style="color:#b9b9b9">Bloqueado</p>
+<button class="btn gold" id="lkface">Desbloquear com Face ID</button><button class="btn lkghost" id="lkpass">Usar a senha da nuvem</button>
+<form id="lkform" hidden><input type="text" name="username" autocomplete="username" value="financas-app" hidden><input name="p" type="password" autocomplete="current-password" placeholder="Senha da nuvem" aria-label="Senha da nuvem"><button class="btn gold">Entrar</button></form>
+<p id="lockmsg" role="status"></p></div></div>
 <div id="toast" role="status"></div>
 <input type="file" id="restoreFile" accept=".json,application/json" hidden>
 <script src="config.js"></script>
@@ -201,7 +222,7 @@ const PAL=['#2f9e6b','#3b7dd8','#d9822b','#c2417a','#7a5af5','#1aa3a3','#b39a1f'
 const DEF_CATS=[['moradia','Moradia','d'],['mercado','Mercado','d'],['comer','Alimentação fora','d'],['transp','Transporte','d'],['saude','Saúde','d'],['educ','Educação','d'],['lazer','Lazer','d'],['assin','Assinaturas','d'],['compras','Compras','d'],['casa','Contas da casa','d'],['outros','Outros','d'],['salario','Salário','r'],['extra','Renda extra','r'],['rend','Rendimentos','r'],['outrosr','Outras receitas','r']].map(([id,name,kind],i)=>({id,name,kind,color:PAL[i%PAL.length]}));
 const KW=[[/ifood|restaur|lanch|padaria|bar |pizz|burger|cafe/,'comer'],[/uber|99 ?pop|99app|posto|combust|shell|ipiranga|estacion|pedagio|metro|onibus/,'transp'],[/mercado|supermerc|atacad|carrefour|assai|extra hiper|pao de acucar|hortifrut/,'mercado'],[/farmac|drogaria|droga|raia|hospital|clinica|laborat|unimed/,'saude'],[/netflix|spotify|prime video|amazon prime|disney|youtube|hbo|max |apple\.com|icloud|google one|deezer|globoplay/,'assin'],[/aluguel|condominio|iptu/,'moradia'],[/energia|enel|cemig|copel|light|sabesp|agua|gas |internet|vivo|claro|tim |oi /,'casa'],[/escola|faculdade|curso|udemy|livraria/,'educ'],[/cinema|ingresso|show|steam|playstation|xbox/,'lazer'],[/salario|salário|folha|pagto sal/,'salario'],[/rendimento|juros|dividend|rend pago/,'rend']];
 
-const S={cfg:null,months:{},month:ym(today()),tab:'inicio',q:'',mode:'',loaded:false,note:''};
+const S={cfg:null,dels:{},months:{},month:ym(today()),tab:'inicio',q:'',mode:'',loaded:false,note:''};
 let store=null;const saving={},dirty={};
 
 const cfg=()=>S.cfg||{accounts:[],cats:DEF_CATS,budgets:{},recur:[],rules:{}};
@@ -218,14 +239,14 @@ async function save(k){
   saving[k]=1;
   try{do{dirty[k]=0;
     if(k==='config')await store.set(k,JSON.parse(JSON.stringify(S.cfg)));
-    else{const tx=S.months[k.slice(2)]||[];if(tx.length)await store.set(k,{tx:JSON.parse(JSON.stringify(tx))});else{delete S.months[k.slice(2)];await store.del(k)}}
+    else{const m=k.slice(2),tx=S.months[m]||[],dl=S.dels[m]||[];if(tx.length||dl.length)await store.set(k,{tx:JSON.parse(JSON.stringify(tx)),del:dl.slice(-1000)});else{delete S.months[m];await store.del(k)}if(!tx.length)delete S.months[m]}
   }while(dirty[k]);markDirty(k)}
   catch(e){toast(e&&e.code==='quota_exceeded'?'Espaço cheio. Exporte um backup e apague meses antigos.':'Não consegui salvar ('+((e&&e.code)||'erro')+'). Tente de novo.')}
   saving[k]=0;
 }
-function putTx(t){const k=ym(t.date);(S.months[k]=S.months[k]||[]).push(t);save('m-'+k)}
+function putTx(t){t.m=Date.now();const k=ym(t.date);(S.months[k]=S.months[k]||[]).push(t);save('m-'+k)}
 function findTx(id){for(const k in S.months){const t=S.months[k].find(x=>x.id===id);if(t)return t}return null}
-function removeTx(id){for(const k in S.months){const i=S.months[k].findIndex(x=>x.id===id);if(i>=0){S.months[k].splice(i,1);save('m-'+k);return}}}
+function removeTx(id,noTomb){for(const k in S.months){const i=S.months[k].findIndex(x=>x.id===id);if(i>=0){S.months[k].splice(i,1);if(!noTomb)(S.dels[k]=S.dels[k]||[]).push(id);save('m-'+k);return}}}
 function learn(desc,cat){const k=norm(desc);if(!k||!cat)return;const c=ensureCfg();if(c.rules[k]!==cat){c.rules[k]=cat;save('config')}}
 function guessCat(desc,kind){const c=cfg();const r=c.rules[norm(desc)];const ok=id=>{const x=c.cats.find(cc=>cc.id===id);return x&&x.kind===kind};
   if(r&&ok(r))return r;const n=' '+norm2(desc)+' ';for(const[re,id]of KW)if(re.test(n)&&ok(id))return id;
@@ -266,6 +287,7 @@ function vHome(){const m=S.month,{r,d}=totals(m),left=r2(r-d),c=cfg();
   const hist=[0,1,2,3,4,5].map(i=>addMonths(m,i-5)).map(k=>({k,...totals(k)})),hm=Math.max(1,...hist.flatMap(h=>[h.r,h.d]));
   return `<section class="hero"><span class="lbl">${left<0?'Faltou':'Sobrou'} em ${MESF[+m.slice(5)-1].toLowerCase()}</span><p class="big num${left<0?' neg':''}">${money(left)}</p>
   <div class="pair"><div><span class="lbl">Receitas</span><b>${money(r)}</b></div><div><span class="lbl">Despesas</span><b>${money(d)}</b></div><div><span class="lbl">Saldo em contas</span><b>${money(tot)}</b></div></div></section>
+  ${m===curM()?vForecast():''}
   ${!c.accounts.length?`<div class="callout"><span>Comece cadastrando uma conta ou cartão.</span><button class="btn" data-act="newAcc">Criar conta</button></div>`:''}
   ${al.length?`<section class="blk"><h2>Atenção</h2><ul class="alerts">${al.join('')}</ul></section>`:''}
   <section class="blk"><h2>Para onde foi o dinheiro</h2>${cats.length?`<ul class="bars">${cats.map(x=>`<li><span class="dot" style="background:${esc(x.c.color)}"></span><span class="nm">${esc(x.c.name)}</span><span class="v">${money(x.v)} <small style="color:var(--mute);font-weight:500">${d?Math.round(x.v/d*100):0}%</small></span><span class="track"><i style="width:${(x.v/max*100).toFixed(1)}%;background:${esc(x.c.color)}"></i></span></li>`).join('')}</ul>`:'<p class="empty">Nenhuma despesa neste mês ainda.</p>'}</section>
@@ -290,6 +312,7 @@ function vAcc(){const c=cfg();
   return `<div class="sec" style="margin-top:0"><div class="hdr"><h2>Contas</h2><button class="btn ghost sm" data-act="newAcc">Nova conta</button></div>${contas.length?contas.map(accCard).join(''):'<p class="empty">Nenhuma conta ainda. Cadastre sua conta corrente, poupança ou carteira.</p>'}</div>
   <div class="sec"><div class="hdr"><h2>Cartões</h2><button class="btn ghost sm" data-act="newCard">Novo cartão</button></div>${cards.length?cards.map(cardCard).join(''):'<p class="empty">Nenhum cartão cadastrado.</p>'}</div>
   ${vCloud()}
+  ${vSecurity()}
   <div class="sec"><div class="hdr"><h2>Backup manual</h2></div><p class="hint">Guarde uma cópia dos seus dados de vez em quando. O arquivo também serve para levar tudo para outro lugar.</p><div class="toolbar"><button class="btn ghost" data-act="exportBk">Exportar backup</button><button class="btn ghost" data-act="restoreBk">Restaurar backup</button></div></div>`}
 
 function vRec(){const c=cfg(),M=S.month,list=c.recur.slice().sort((a,b)=>a.day-b.day);
@@ -317,10 +340,10 @@ function render(){
   $('#main').innerHTML=({inicio:vHome,lanc:vTx,contas:vAcc,fixas:vRec,orc:vBud})[S.tab]();
 }
 
-function openTx(t,pre){const c=cfg();if(!c.accounts.length){toast('Cadastre uma conta primeiro.');openAcc(null,'conta');return}
+function openTx(t,pre,note){const c=cfg();if(!c.accounts.length){toast('Cadastre uma conta primeiro.');openAcc(null,'conta');return}
   const isNew=!t,x=t?{...t}:{id:uid(),kind:'d',amt:'',desc:'',date:S.month===curM()?today():S.month+'-01',cat:'',acc:c.accounts[0].id,to:'',...pre};
   if(!x.to)x.to=(c.accounts.find(a=>a.id!==x.acc)||{}).id||'';
-  sheet(`<form id="f" novalidate><h2>${isNew?'Novo lançamento':'Editar lançamento'}</h2>
+  sheet(`<form id="f" novalidate><h2>${isNew?'Novo lançamento':'Editar lançamento'}</h2>${note?`<p class="hint" style="color:var(--ink)">${esc(note)}</p>`:''}
   <div class="seg">${[['d','Despesa'],['r','Receita'],['t','Transferência']].map(([k,l])=>`<label><input type="radio" name="kind" value="${k}" ${x.kind===k?'checked':''}><span>${l}</span></label>`).join('')}</div>
   <div class="two"><label class="fld"><span>Valor (R$)</span><input name="amt" inputmode="decimal" autocomplete="off" value="${x.amt===''?'':esc(String(x.amt).replace('.',','))}" placeholder="0,00"></label>
   <label class="fld"><span>Data</span><input name="date" type="date" value="${esc(x.date)}"></label></div>
@@ -344,11 +367,11 @@ function openTx(t,pre){const c=cfg();if(!c.accounts.length){toast('Cadastre uma 
     if(!f.date.value){toast('Informe a data.');return}
     const k=f.kind.value,nt={id:x.id,kind:k,amt:r2(amt),desc:f.desc.value.trim(),date:f.date.value,acc:f.acc.value};
     if(k==='t'){if(f.to.value===nt.acc||!f.to.value){toast('Escolha duas contas diferentes.');return}nt.to=f.to.value}else nt.cat=f.cat.value;
-    for(const p of['rid','fat','fitid','inst'])if(x[p])nt[p]=x[p];
+    for(const p of['rid','fat','fitid','inst','auto'])if(x[p])nt[p]=x[p];
     const pp=q('parc'),n=isNew&&pp&&!pp.hidden?Math.max(1,Math.min(48,parseInt(f.parc.value)||1)):1;
     if(n>1){const each=Math.floor(nt.amt/n*100)/100,first=r2(nt.amt-each*(n-1)),day=+nt.date.slice(8),base=nt.desc||catOf(nt.cat).name;
       for(let i=0;i<n;i++)putTx({...nt,id:uid(),amt:i?each:first,date:mkDate(addMonths(ym(nt.date),i),day),desc:`${base} (${i+1}/${n})`,inst:`${i+1}/${n}`})}
-    else{if(!isNew)removeTx(x.id);putTx(nt)}
+    else{if(!isNew)removeTx(x.id,ym(x.date)===ym(nt.date));putTx(nt)}
     if(k!=='t'&&nt.desc)learn(nt.desc,nt.cat);
     closeSheet();render();toast(n>1?n+' parcelas lançadas.':isNew?'Lançamento salvo.':'Alterações salvas.')};
   const del=$('#del');if(del)del.onclick=async()=>{if(await ask('Excluir este lançamento?','Excluir')){removeTx(x.id);closeSheet();render();toast('Lançamento excluído.')}};
@@ -443,7 +466,7 @@ function openImport(){const c=cfg();if(!c.accounts.length){toast('Cadastre uma c
   f.file.onchange=async()=>{const file=f.file.files[0];if(!file)return;try{text=await readText(file)}catch(e){toast('Não consegui ler o arquivo.');return}ofx=/OFXHEADER|<OFX>/i.test(text);setInv();build()};
   f.acc.onchange=()=>{setInv();build()};f.inv.onchange=build;
   f.onsubmit=e=>{e.preventDefault();const acc=f.acc.value,nw=rows.filter(r=>!r.dup),touched=new Set();if(!nw.length)return;
-    for(const r of nw){const t={id:uid(),kind:r.kind,amt:r.amt,desc:r.desc,date:r.date,acc,cat:r.cat};if(r.fitid)t.fitid=r.fitid;const k=ym(t.date);(S.months[k]=S.months[k]||[]).push(t);touched.add(k)}
+    for(const r of nw){const t={id:uid(),kind:r.kind,amt:r.amt,desc:r.desc,date:r.date,acc,cat:r.cat,m:Date.now()};if(r.fitid)t.fitid=r.fitid;const k=ym(t.date);(S.months[k]=S.months[k]||[]).push(t);touched.add(k)}
     touched.forEach(k=>save('m-'+k));const last=[...touched].sort().pop();if(last)S.month=last;closeSheet();S.tab='lanc';render();toast(nw.length+' lançamentos importados. Toque em um para mudar a categoria.')};
 }
 
@@ -473,7 +496,8 @@ const act={
   newCat:()=>openCat(),editCat:id=>{const c=cfg().cats.find(x=>x.id===id);if(c)openCat(c)},
   import:()=>openImport(),exportBk:()=>exportBk(),restoreBk:()=>{const i=$('#restoreFile');i.value='';i.click()},
   close:()=>closeSheet(),
-  cloud:()=>openCloud(),syncNow:()=>{sync(true)},notifOn:()=>enableNotif(),notifTest:()=>testNotif(),cloudOff:()=>cloudOff(),setApi:()=>setApi()
+  cloud:()=>openCloud(),lockOn:()=>enableLock(),lockOff:()=>disableLock(),apHelp:()=>openApHelp(),apTest:()=>{const c=cfg(),a=c.accounts.find(a=>a.type==='cartao')||c.accounts[0];handleAp('12,34|Padaria Teste|'+(a?a.name:''))},
+  fcToggle:()=>{S.fcOpen=!S.fcOpen;render()},syncNow:()=>{sync(true)},notifOn:()=>enableNotif(),notifTest:()=>testNotif(),cloudOff:()=>cloudOff(),setApi:()=>setApi()
 };
 document.addEventListener('click',e=>{const t=e.target.closest('[data-tab]');if(t){S.tab=t.dataset.tab;render();scrollTo(0,0);return}
   const b=e.target.closest('[data-act]');if(b&&act[b.dataset.act]){e.preventDefault();act[b.dataset.act](b.dataset.id)}
@@ -521,8 +545,14 @@ let syncT=0,syncing=false,again=false;
 function schedSync(ms=1500){clearTimeout(syncT);syncT=setTimeout(()=>sync(),ms)}
 function writeLocal(n,o){
   if(n==='config'){if(o.del){S.cfg=null;localStorage.removeItem('fin:config')}else{S.cfg=o.b;localStorage.setItem('fin:config',JSON.stringify(o.b))}}
-  else{const m=n.slice(2);if(o.del||!o.b||!Array.isArray(o.b.tx)||!o.b.tx.length){delete S.months[m];localStorage.removeItem('fin:'+n)}else{S.months[m]=o.b.tx;localStorage.setItem('fin:'+n,JSON.stringify({tx:o.b.tx}))}}}
-function bodyOf(n){if(n==='config')return S.cfg?{b:S.cfg}:{del:1};const t=S.months[n.slice(2)];return t&&t.length?{b:{tx:t}}:{del:1}}
+  else{const m=n.slice(2),tx=o.b&&Array.isArray(o.b.tx)?o.b.tx:[],dl=o.b&&Array.isArray(o.b.del)?o.b.del:[];
+    if(o.del||(!tx.length&&!dl.length)){delete S.months[m];delete S.dels[m];localStorage.removeItem('fin:'+n)}
+    else{if(tx.length)S.months[m]=tx;else delete S.months[m];S.dels[m]=dl;localStorage.setItem('fin:'+n,JSON.stringify({tx,del:dl}))}}}
+function bodyOf(n){if(n==='config')return S.cfg?{b:S.cfg}:{del:1};const m=n.slice(2),t=S.months[m]||[],dl=S.dels[m]||[];return t.length||dl.length?{b:{tx:t,del:dl.slice(-1000)}}:{del:1}}
+// junta duas versões do mesmo mês: une os lançamentos, fica com a edição mais recente e respeita exclusões
+function mergeMonth(a,b){const del=[...new Set([...(a.del||[]),...(b.del||[])])],gone=new Set(del),by=new Map();
+  for(const t of[...(b.tx||[]),...(a.tx||[])]){if(gone.has(t.id))continue;const cur=by.get(t.id);if(!cur||(t.m||0)>=(cur.m||0))by.set(t.id,t)}
+  return{tx:[...by.values()],del:del.slice(-1000)}}
 const NAME_RE=/^(config|m-\d{4}-\d{2})$/;
 async function sync(manual){
   if(!K||!SY.on||!API())return;if(syncing){again=true;return}
@@ -530,14 +560,16 @@ async function sync(manual){
   try{
     const dirtyL=Object.entries(SY.docs).filter(([,m])=>m.dirty).map(([n,m])=>[n,m.u]);
     if(dirtyL.length){const docs=[];
-      for(const[n,u]of dirtyL){const x=bodyOf(n);docs.push({id:await docId(n),u,...await seal({n,b:x.b||null,del:!!x.del},'doc')})}
+      for(const[n,u]of dirtyL){const x=bodyOf(n);const id=await docId(n);docs.push({id,u,base:SY.srv[id]??null,...await seal({n,b:x.b||null,del:!!x.del},'doc')})}
       const r=await api('POST','/api/docs',{docs});
       for(const[n,u]of dirtyL){const id=await docId(n),s=r.docs[id];if(s&&s.u===u&&SY.docs[n]&&SY.docs[n].u===u){SY.docs[n].dirty=0;SY.srv[id]=u}}}
     const{docs:remote}=await api('GET','/api/docs');
     for(const id in remote){const d=remote[id];if(SY.srv[id]===d.u)continue;
       let o;try{o=await unseal(d,'doc')}catch(e){continue}
       if(!o||!NAME_RE.test(o.n))continue;const loc=SY.docs[o.n];
-      if(loc&&loc.dirty&&loc.u>d.u){SY.srv[id]=d.u;continue}
+      if(loc&&loc.dirty){SY.srv[id]=d.u;
+        if(o.n!=='config'&&!o.del){const m=o.n.slice(2);writeLocal(o.n,{b:mergeMonth({tx:S.months[m]||[],del:S.dels[m]||[]},o.b)});SY.docs[o.n]={u:Math.max(Date.now(),d.u+1),dirty:1};again=true;changed=true;continue}
+        if(loc.u>d.u)continue}
       writeLocal(o.n,o);SY.docs[o.n]={u:d.u,dirty:0};SY.srv[id]=d.u;changed=true}
     await pushSchedule();
     SY.last=Date.now();SY.err='';if(manual)toast('Sincronizado.');
@@ -566,8 +598,8 @@ async function pushSchedule(){const list=buildReminders(),plain=JSON.stringify(l
 // ---- ativar / entrar ----
 async function firstMerge(){const{docs:remote}=await api('GET','/api/docs'),seen=new Set();
   for(const id in remote){const d=remote[id];let o;try{o=await unseal(d,'doc')}catch(e){continue}if(!o||!NAME_RE.test(o.n))continue;seen.add(o.n);SY.srv[id]=d.u;
-    if(o.n!=='config'&&!o.del){const loc=S.months[o.n.slice(2)]||[],ids=new Set(o.b.tx.map(t=>t.id)),extra=loc.filter(t=>!ids.has(t.id));
-      writeLocal(o.n,{b:{tx:o.b.tx.concat(extra)}});SY.docs[o.n]=extra.length?{u:Date.now(),dirty:1}:{u:d.u,dirty:0}}
+    if(o.n!=='config'&&!o.del){const m=o.n.slice(2),loc=S.months[m]||[],ids=new Set((o.b.tx||[]).map(t=>t.id)),extra=loc.filter(t=>!ids.has(t.id));
+      writeLocal(o.n,{b:mergeMonth({tx:loc,del:S.dels[m]||[]},o.b)});SY.docs[o.n]=extra.length?{u:Date.now(),dirty:1}:{u:d.u,dirty:0}}
     else{writeLocal(o.n,o);SY.docs[o.n]={u:d.u,dirty:0}}}
   if(S.cfg&&!seen.has('config'))SY.docs.config={u:Date.now(),dirty:1};
   for(const m in S.months)if(!seen.has('m-'+m))SY.docs['m-'+m]={u:Date.now(),dirty:1}}
@@ -596,7 +628,7 @@ async function openCloud(){
       if(novo){await api('POST','/api/setup',{salt,iter,authHash:b64u(new Uint8Array(await crypto.subtle.digest('SHA-256',te.encode(k.auth))))},false);
         SY={on:1,docs:{},srv:{},schedHash:'',last:0,err:'',notif:SY.notif||0};if(S.cfg)SY.docs.config={u:Date.now(),dirty:1};for(const m in S.months)SY.docs['m-'+m]={u:Date.now(),dirty:1}}
       else{SY={on:1,docs:{},srv:{},schedHash:'',last:0,err:'',notif:SY.notif||0};await firstMerge()}
-      await idbOp('readwrite',s=>s.put(k,'k'));
+      await idbOp('readwrite',s=>s.put(k,'k'));SY.salt=salt;SY.iter=iter;
       saveSY();closeSheet();S.mode='local';render();await sync();toast(SY.err||'Nuvem segura ativada.');
     }catch(e){K=null;SY.on=0;saveSY();go.disabled=false;
       st.textContent=e&&e.status===401?'Senha incorreta.':e&&e.status===403?'A nuvem já foi configurada em outro aparelho. Feche e toque em "Entrar".':errMsg(e)}};
@@ -641,14 +673,106 @@ async function cloudInit(){
   try{K=await idbOp('readonly',s=>s.get('k'))||null}catch(e){K=null}
   if(SY.on&&!K){SY.on=0;saveSY()}
   render();if(!SY.on)return;
+  if(!SY.salt)api('GET','/api/meta',null,false).then(m=>{if(m&&m.salt){SY.salt=m.salt;SY.iter=m.iter;saveSY()}}).catch(()=>{});
   sync();
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')sync()});
   addEventListener('online',()=>sync());
   setInterval(()=>{if(document.visibilityState==='visible')sync()},60000);
 }
 
+// ================= PREVISÃO DO MÊS =================
+function forecast(){const c=cfg(),M=curM(),t0=today(),items=[];
+  for(const r of c.recur){if(recPaid(r,M))continue;const a=accOf(r.acc);items.push({date:mkDate(M,+r.day),name:r.name,amt:+r.amount||0,kind:r.kind==='r'?'in':'out',card:!!(a&&a.type==='cartao')})}
+  for(const a of c.accounts.filter(a=>a.type==='cartao'))for(const fm of[addMonths(M,-2),addMonths(M,-1),M]){const due=fatDue(a,fm);if(ym(due)!==M||fatPaid(a,fm))continue;const v=fatura(a,fm);if(v>0)items.push({date:due,name:'Fatura '+a.name,amt:v,kind:'fat'})}
+  items.sort((x,y)=>x.date.localeCompare(y.date));
+  const{r,d}=totals(M),pin=items.filter(i=>i.kind==='in').reduce((s,i)=>s+i.amt,0),pout=items.filter(i=>i.kind==='out').reduce((s,i)=>s+i.amt,0);
+  const sobra=r2(r+pin-d-pout),left=dim(M)-(+t0.slice(8))+1;
+  const contas=c.accounts.filter(a=>a.type!=='cartao');
+  const caixa=r2(contas.reduce((s,a)=>s+balance(a),0)+pin-items.filter(i=>i.kind==='out'&&!i.card).reduce((s,i)=>s+i.amt,0)-items.filter(i=>i.kind==='fat').reduce((s,i)=>s+i.amt,0));
+  return{items,sobra,left,perDay:sobra>0?Math.floor(sobra/left*100)/100:0,caixa,hasContas:contas.length>0,t0,M}}
+function vForecast(){const c=cfg();if(!c.recur.length&&!c.accounts.some(a=>a.type==='cartao'))return'';
+  const f=forecast(),neg=f.sobra<0,end=fmtD(mkDate(f.M,31));
+  return`<section class="fc"><span class="lbl" style="opacity:1;color:var(--mute)">Previsão: ${neg?'deve faltar':'deve sobrar'} até ${end}</span>
+  <p class="fbig ${neg?'neg':''}">${money(Math.abs(f.sobra))}</p>
+  <p>${neg?'As contas que ainda vão vencer passam do que entrou no mês.':f.perDay>0?`Dá para gastar até <b>${money(f.perDay)} por dia</b> nos próximos ${f.left} dia${f.left>1?'s':''}.`:''}</p>
+  ${f.hasContas?`<p class="meta" style="color:var(--mute);font-size:14px">Saldo previsto nas contas em ${end}: <b style="color:var(--ink)">${money(f.caixa)}</b></p>`:''}
+  ${f.items.length?`<button class="linkbtn" data-act="fcToggle" aria-expanded="${S.fcOpen?'true':'false'}">${S.fcOpen?'Ocultar':'Ver'} o que ainda vence (${f.items.length})</button>
+  ${S.fcOpen?`<ul>${f.items.map(i=>`<li><span style="color:${i.date<f.t0?'var(--neg)':'var(--mute)'}">${fmtD(i.date)}</span><span>${esc(i.name)}${i.date<f.t0?' · atrasada':''}</span><b class="${i.kind==='in'?'pos':''}">${i.kind==='in'?'+':'−'}${money(i.amt)}</b></li>`).join('')}</ul>`:''}`:'<p class="hint" style="margin:6px 0 0">Nenhuma conta fixa ou fatura pendente neste mês.</p>'}</section>`}
+
+// ================= APPLE PAY (Atalhos do iPhone) =================
+// O Atalho abre: .../Financas/?ap=<valor>|<estabelecimento>|<cartão>
+const AP_BASE=location.origin+location.pathname.replace(/index\.html$/,'')+'?ap=';
+function matchAcc(card){const c=cfg(),n=norm2(card||'').trim(),words=n.split(/\s+/).filter(w=>w.length>2);
+  if(n){const sc=a=>{const an=norm2(a.name).trim();if(!an)return 0;if(n.includes(an)||an.includes(n))return 3;return an.split(/\s+/).some(w=>w.length>2&&words.includes(w))?2:0};
+    const best=c.accounts.map(a=>({a,s:sc(a)+(a.type==='cartao'?.5:0)})).filter(x=>x.s>=2).sort((x,y)=>y.s-x.s)[0];if(best)return best.a.id}
+  if(c.apAcc&&accOf(c.apAcc))return c.apAcc;const card1=c.accounts.find(a=>a.type==='cartao');return(card1||c.accounts[0]).id}
+function handleAp(ap){const parts=String(ap).split('|'),amt=Math.abs(num(parts[0]));
+  if(!(amt>0)){toast('Não entendi o valor da compra ('+parts[0]+').');return}
+  const c=cfg();if(!c.accounts.length){toast('Cadastre uma conta ou cartão primeiro.');return}
+  const desc=String(parts[1]||'Compra Apple Pay').replace(/\s+/g,' ').trim().slice(0,80),t={id:uid(),kind:'d',amt:r2(amt),desc,date:today(),acc:matchAcc(parts[2]),cat:guessCat(desc,'d'),auto:1};
+  putTx(t);if(SY.on&&K)schedSync(150);
+  S.tab='inicio';S.month=curM();render();
+  openTx(t,null,(SY.on&&K?'':'⚠ Este navegador não está conectado à nuvem: o lançamento ficou só aqui. Entre em Contas › Ativar nuvem segura. ')+'Compra no Apple Pay lançada. Confira a categoria e toque em Salvar, ou em Cancelar para manter como está.')}
+function handleIncoming(){let q;try{q=new URLSearchParams(location.search)}catch(e){return}const ap=q.get('ap');if(!ap)return;
+  try{history.replaceState(null,'',location.pathname+location.hash)}catch(e){}
+  if(locked){pendingAp=ap;return}handleAp(ap)}
+let pendingAp=null;
+function openApHelp(){const c=cfg();
+  sheet(`<h2>Lançar pelo Apple Pay</h2>
+  <p class="hint">Quando você pagar com o iPhone, uma automação abre o app com o valor e o estabelecimento já preenchidos.</p>
+  <p class="hint"><b>Antes, uma vez:</b> a automação abre o <b>Safari</b>, não o ícone. Abra o app no Safari e entre na nuvem com sua senha, para o lançamento chegar até aqui.</p>
+  <ol class="steps">
+  <li>No app <b>Atalhos</b>, abra <b>Automação</b>, toque em <b>+</b> e escolha <b>Transação</b> (Carteira).</li>
+  <li>Marque seus cartões, escolha <b>Executar Imediatamente</b> e toque em <b>Seguinte</b> › <b>Nova Automação em Branco</b>.</li>
+  <li>Adicione a ação <b>Texto</b> e monte: <b>Quantia</b> | <b>Comerciante</b> | <b>Nome</b> do cartão. Toque no campo, escolha a variável <i>Entrada do Atalho</i> e depois a informação. Separe com a barra vertical <b>|</b>.</li>
+  <li>Adicione a ação <b>Codificar URL</b>. Ela usa o Texto automaticamente.</li>
+  <li>Adicione <b>Abrir URLs</b> e escreva o endereço abaixo, seguido da variável <i>Texto Codificado em URL</i>:</li></ol>
+  <code class="u" id="apurl">${esc(AP_BASE)}</code>
+  <div class="row" style="justify-content:flex-start"><button class="btn ghost sm" id="apcopy">Copiar endereço</button><button class="btn ghost sm" data-act="apTest">Simular uma compra</button></div>
+  <label class="fld" style="margin-top:14px"><span>Se o nome do cartão não bater com nenhuma conta, lançar em:</span><select id="apacc">${accOpts(c.apAcc||(c.accounts.find(a=>a.type==='cartao')||c.accounts[0]||{}).id)}</select></label>
+  <div class="row"><button class="btn" data-act="close">Fechar</button></div>`);
+  $('#apcopy').onclick=async()=>{try{await navigator.clipboard.writeText(AP_BASE);toast('Endereço copiado.')}catch(e){toast('Selecione e copie o endereço.')}};
+  const s=$('#apacc');if(s)s.onchange=()=>{const cc=ensureCfg();cc.apAcc=s.value;save('config');toast('Salvo.')}}
+
+// ================= BLOQUEIO COM FACE ID =================
+const LK=()=>{try{return JSON.parse(localStorage.getItem('fin:lock')||'null')}catch(e){return null}};
+let locked=false,hiddenAt=0;
+function showLock(){if(!LK())return;locked=true;$('#lock').hidden=false;$('#lockmsg').textContent='';$('#lkform').hidden=true;closeSheet()}
+function unlock(){locked=false;$('#lock').hidden=true;document.body.classList.remove('cover');if(pendingAp){const a=pendingAp;pendingAp=null;handleAp(a)}}
+async function unlockFace(silent){const l=LK();if(!l)return unlock();
+  try{await navigator.credentials.get({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),rpId:location.hostname,allowCredentials:[{type:'public-key',id:unb64u(l.id)}],userVerification:'required',timeout:60000}});unlock()}
+  catch(e){if(!silent)$('#lockmsg').textContent='Não foi possível confirmar. Tente de novo ou use a senha da nuvem.'}}
+async function unlockPass(p){const m=$('#lockmsg');if(!K||!SY.salt){m.textContent='A senha só funciona com a nuvem ativa neste aparelho.';return}
+  m.textContent='Conferindo…';try{const k=await deriveKeys(p,SY.salt,SY.iter||ITER);if(k.auth===K.auth){unlock()}else m.textContent='Senha incorreta.'}catch(e){m.textContent='Não consegui conferir a senha.'}}
+async function enableLock(){
+  if(!SY.on||!K){toast('Ative a nuvem segura antes: a senha dela é a alternativa se o Face ID falhar.');return}
+  if(!window.PublicKeyCredential||!navigator.credentials){toast('Este aparelho não permite Face ID aqui.');return}
+  try{const cred=await navigator.credentials.create({publicKey:{rp:{name:'Finanças',id:location.hostname},user:{id:crypto.getRandomValues(new Uint8Array(16)),name:'Bloqueio do app Finanças',displayName:'Finanças'},
+      challenge:crypto.getRandomValues(new Uint8Array(32)),pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+      authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'preferred'},timeout:60000,attestation:'none'}});
+    if(!SY.salt){try{const m=await api('GET','/api/meta',null,false);SY.salt=m.salt;SY.iter=m.iter;saveSY()}catch(e){}}
+    localStorage.setItem('fin:lock',JSON.stringify({id:b64u(new Uint8Array(cred.rawId)),at:Date.now()}));render();toast('Bloqueio com Face ID ativado.')}
+  catch(e){toast(e&&e.name==='NotAllowedError'?'Cancelado.':'Não consegui ativar ('+((e&&e.name)||'erro')+').')}}
+async function disableLock(){if(!await ask('Desativar o bloqueio com Face ID?','Desativar'))return;localStorage.removeItem('fin:lock');render();toast('Bloqueio desativado.')}
+function vSecurity(){const on=!!LK(),c=cfg();
+  return`<div class="sec"><div class="hdr"><h2>Segurança</h2></div><div class="card">
+  <p style="margin:0">${on?'O app pede Face ID ao abrir e ao voltar depois de 1 minuto fora.':'Peça Face ID para abrir o app. Se alguém pegar seu iPhone desbloqueado, não vê suas finanças.'}</p>
+  <div class="act">${on?'<span class="chip ok">Ativo</span><button class="btn ghost sm" data-act="lockOff">Desativar</button>':'<button class="btn sm" data-act="lockOn">Ativar bloqueio com Face ID</button>'}</div>
+  <p class="hint" style="margin:12px 0 0">Para esconder os valores das notificações na tela bloqueada: Ajustes › Notificações › Mostrar Pré-visualizações › Quando Desbloqueado.</p></div></div>
+  <div class="sec"><div class="hdr"><h2>Apple Pay</h2></div><div class="card"><p style="margin:0">Lance as compras automaticamente quando pagar com o iPhone.</p>
+  <div class="act"><button class="btn sm" data-act="apHelp">Configurar</button>${c.accounts.length?'<button class="btn ghost sm" data-act="apTest">Simular compra</button>':''}</div></div></div>`}
+function lockInit(){
+  if(LK()){showLock();unlockFace(true)}
+  $('#lkface').onclick=()=>unlockFace(false);
+  $('#lkpass').onclick=()=>{$('#lkform').hidden=false;$('#lkform').p.focus()};
+  $('#lkform').onsubmit=e=>{e.preventDefault();unlockPass($('#lkform').p.value)};
+  document.addEventListener('visibilitychange',()=>{if(!LK())return;
+    if(document.visibilityState==='hidden'){hiddenAt=Date.now();document.body.classList.add('cover')}
+    else{if(!locked&&hiddenAt&&Date.now()-hiddenAt>60000){showLock();unlockFace(true)}if(!locked)document.body.classList.remove('cover')}});
+}
+
 function useLocal(){S.mode='local';
-  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k||!/^fin:(config|m-\d{4}-\d{2})$/.test(k))continue;const b=JSON.parse(localStorage.getItem(k)),id=k.slice(4);if(id==='config')S.cfg=b;else if(id.startsWith('m-')&&b&&Array.isArray(b.tx))S.months[id.slice(2)]=b.tx}}catch(e){}
+  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k||!/^fin:(config|m-\d{4}-\d{2})$/.test(k))continue;const b=JSON.parse(localStorage.getItem(k)),id=k.slice(4);if(id==='config')S.cfg=b;else if(id.startsWith('m-')&&b&&Array.isArray(b.tx)){if(b.tx.length)S.months[id.slice(2)]=b.tx;if(Array.isArray(b.del))S.dels[id.slice(2)]=b.del}}}catch(e){}
   try{S.bk=localStorage.getItem('fin:lastbk')||''}catch(e){}
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
   store={set:async(k,b)=>{try{localStorage.setItem('fin:'+k,JSON.stringify(b))}catch(e){throw{code:e&&e.name==='QuotaExceededError'?'quota_exceeded':'erro'}}},del:async k=>{localStorage.removeItem('fin:'+k)}};
@@ -658,7 +782,7 @@ if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostnam
 render();
 (async()=>{let db=null,id=null;
   try{if(typeof claude!=='undefined'){db=await claude.use('db');const u=await claude.use('user');id=u?await u.id():null}}catch(e){}
-  if(!db||!id){useLocal();cloudInit();return}
+  if(!db||!id){lockInit();useLocal();await cloudInit();handleIncoming();return}
   const col=db.collection('data/users/'+id);
   store={set:(k,b)=>col.doc(k).set(b),del:k=>col.doc(k).delete()};S.mode='nuvem';render();
   const tm=setTimeout(()=>{S.note=S.loaded?'Seus dados podem estar desatualizados, sem conexão no momento.':'Ainda não consegui carregar seus dados. Verifique a conexão.';render()},10000);
