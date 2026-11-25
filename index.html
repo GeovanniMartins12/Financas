@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Finanças">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c0d0d" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>Controle financeiro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: calm personal money tool, direct, no props
+   IDEA: a pocket ledger — one month per page, the leftover number first
+   PICTURE: the month's result set large in a mint field, category bars under it
+   COLOUR and TYPE: black/white plus mint #b8f5d0; Space Grotesk 700 numbers, Inter text
+   LAYOUT: phone first; header with month switcher, content column, bottom tab bar, + button */
+:root{color-scheme:light dark;
+--bg:light-dark(#ffffff,#0c0d0d);--ink:light-dark(#0b0b0b,#f1f3f2);--mute:light-dark(#5b625f,#9aa39f);
+--line:light-dark(#e5e8e6,#262a29);--card:light-dark(#f4f6f5,#151817);
+--hero:light-dark(#b8f5d0,#0f1d16);--heroink:light-dark(#0b0b0b,#b8f5d0);--mint:#b8f5d0;
+--neg:light-dark(#c0322c,#ff7a72);--pos:light-dark(#11704a,#86e3ae);--warn:light-dark(#975200,#ffbe5c);
+--in:light-dark(#2a9d68,#86e3ae);--out:light-dark(#0b0b0b,#e9ecea)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Inter,system-ui,sans-serif;overflow-x:clip;-webkit-tap-highlight-color:transparent}
+h1,h2,h3,.big,.num{font-family:"Space Grotesk",Inter,sans-serif}
+button,input,select{font:inherit;color:inherit}
+header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:calc(env(safe-area-inset-top) + 10px) max(4vw,14px) 8px}
+.hd{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:8px}
+.hd h1{font-size:20px;margin:0;flex:1}
+.mnav{display:flex;align-items:center;gap:2px}
+.mnav b{font:600 15px Inter;min-width:118px;text-align:center;white-space:nowrap}
+.ib{width:44px;height:44px;border:0;background:none;border-radius:12px;cursor:pointer;display:grid;place-items:center}
+.ib:hover{background:var(--card)}
+.ib svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2}
+#mode{max-width:760px;margin:2px auto 0;font-size:13px;color:var(--mute)}
+#note{max-width:760px;margin:6px auto 0;font-size:14px;color:var(--warn)}
+main{max-width:760px;margin:0 auto;padding:16px max(4vw,14px) calc(130px + env(safe-area-inset-bottom))}
+.hero{background:var(--hero);color:var(--heroink);border-radius:20px;padding:22px 20px 18px;margin:0 0 18px}
+.lbl{font-size:13px;opacity:.8;display:block}
+.big{font-size:clamp(38px,11vw,52px);line-height:1.05;font-weight:700;margin:4px 0 16px;white-space:nowrap}
+.big.neg{color:var(--neg)}
+.pair{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;border-top:1px solid color-mix(in srgb,currentColor 22%,transparent);padding-top:12px}
+.pair b{font:600 16px "Space Grotesk",Inter,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.blk{margin:22px 0}
+.blk h2,.sec h2{font-size:18px;margin:0 0 10px}
+.empty{color:var(--mute);padding:18px 0}
+.callout{background:var(--card);border-radius:14px;padding:14px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.alerts{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.alerts li{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:12px;padding:10px 12px;border-left:4px solid var(--warn)}
+.alerts li.bad{border-left-color:var(--neg)}
+.alerts li span{flex:1}
+.bars{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.bars li{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:4px 10px;align-items:center}
+.bars .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bars .v{font:600 15px "Space Grotesk",Inter,sans-serif;white-space:nowrap;text-align:right}
+.track{grid-column:2/4;height:8px;background:var(--card);border-radius:8px;overflow:hidden}
+.track i{display:block;height:100%;border-radius:8px}
+.dot{width:12px;height:12px;border-radius:50%;flex:none}
+.cols{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;height:150px;align-items:end}
+.col{display:flex;flex-direction:column;align-items:center;gap:6px;height:100%}
+.pair2{flex:1;width:100%;display:flex;gap:3px;align-items:flex-end;justify-content:center}
+.pair2 i{width:min(18px,40%);border-radius:4px 4px 0 0;min-height:2px}
+.in{background:var(--in)}.out{background:var(--out)}
+.col span{font-size:13px;color:var(--mute)}
+.legend{font-size:13px;color:var(--mute);display:flex;gap:6px;align-items:center}
+.legend i{width:10px;height:10px;border-radius:2px;display:inline-block;margin-left:8px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap}
+.toolbar input{flex:1 1 180px}
+input,select{height:46px;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:0 12px;font-size:16px;width:100%}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:3px solid var(--in);outline-offset:1px}
+.sum{color:var(--mute);font-size:14px;margin:12px 0 0}
+.sum b{font-family:"Space Grotesk",Inter,sans-serif;white-space:nowrap}
+.pos{color:var(--pos)}.neg{color:var(--neg)}
+.day{font:600 13px Inter;color:var(--mute);margin:18px 0 4px}
+.txs{list-style:none;margin:0;padding:0}
+.tx{width:100%;display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:0 12px;align-items:center;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:11px 2px;cursor:pointer;min-height:56px}
+.tx .dot{grid-row:1/3}
+.t1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.t2{grid-column:2/4;font-size:13px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.amt{font:600 15px "Space Grotesk",Inter,sans-serif;white-space:nowrap}
+.prev{max-height:38vh;overflow:auto;margin-bottom:8px}
+.prev .dup{opacity:.4}
+.btn{height:44px;padding:0 16px;border-radius:12px;border:0;background:var(--ink);color:var(--bg);font-weight:600;cursor:pointer;white-space:nowrap}
+.btn.ghost{background:var(--card);color:var(--ink)}
+.btn.sm{height:36px;padding:0 12px;font-size:14px}
+.btn.danger{background:none;color:var(--neg);margin-right:auto;padding:0 6px}
+.btn:disabled{opacity:.4}
+.card{background:var(--card);border-radius:16px;padding:14px 16px;margin:0 0 10px}
+.card .top{display:flex;align-items:center;gap:10px}
+.card .top b{flex:1;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .bal{font:700 24px "Space Grotesk",Inter,sans-serif;white-space:nowrap;margin:4px 0 0}
+.card .meta{font-size:14px;color:var(--mute)}
+.card .act{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.chip{font-size:13px;font-weight:600;padding:3px 9px;border-radius:20px;background:var(--bg);white-space:nowrap}
+.chip.ok{color:var(--pos)}.chip.bad{color:var(--neg)}.chip.warn{color:var(--warn)}
+.sec{margin:26px 0 0}
+.sec .hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.sec .hdr h2{margin:0}
+.bud{width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:12px 2px;cursor:pointer;display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:6px 10px;align-items:center}
+.bud .track{height:10px}
+.bud small{grid-column:2/4;font-size:13px;color:var(--mute)}
+.fab{position:fixed;right:max(4vw,16px);bottom:calc(84px + env(safe-area-inset-bottom));width:58px;height:58px;border-radius:50%;border:0;background:var(--mint);color:#0b0b0b;box-shadow:0 6px 18px rgba(0,0,0,.18);cursor:pointer;display:grid;place-items:center;z-index:6}
+.fab svg{width:26px;height:26px;stroke:#0b0b0b;stroke-width:2.4;fill:none}
+nav{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--bg);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav div{max-width:760px;margin:0 auto;display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+nav button{border:0;background:none;height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12px;color:var(--mute);cursor:pointer}
+nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.9}
+nav button[aria-current=page]{color:var(--ink);font-weight:600}
+#sheet,#ask{position:fixed;inset:0;z-index:20;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.45)}
+#sheet[hidden],#ask[hidden]{display:none}
+.sh{background:var(--bg);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:22px 22px 0 0;padding:20px 18px calc(18px + env(safe-area-inset-bottom))}
+.sh h2{margin:0 0 14px;font-size:22px}
+@media(min-width:700px){#sheet,#ask{align-items:center}.sh{border-radius:22px}}
+.fld{display:block;margin:0 0 12px}
+.fld>span{display:block;font-size:14px;font-weight:500;margin:0 0 5px}
+.fld[hidden]{display:none}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:var(--card);border-radius:12px;padding:4px;margin:0 0 14px}
+.seg.s2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.seg label{position:relative}
+.seg input{position:absolute;opacity:0;width:1px;height:1px}
+.seg span{display:grid;place-items:center;height:40px;border-radius:9px;font-size:14px;font-weight:500;cursor:pointer}
+.seg input:checked+span{background:var(--bg);box-shadow:0 1px 3px rgba(0,0,0,.15);font-weight:600}
+.seg input:focus-visible+span{outline:3px solid var(--in)}
+.sw{display:flex;gap:8px;flex-wrap:wrap}
+.sw label{position:relative}
+.sw input{position:absolute;opacity:0;width:1px;height:1px}
+.sw span{display:block;width:34px;height:34px;border-radius:50%;cursor:pointer;border:3px solid transparent}
+.sw input:checked+span{border-color:var(--ink)}
+.chk{display:flex;gap:10px;align-items:center;font-size:14px;margin:0 0 12px}
+.chk input{width:22px;height:22px}
+.row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+.hint{font-size:14px;color:var(--mute);margin:0 0 12px}
+.hint.bad{color:var(--neg)}
+textarea{width:100%;height:40vh;font:13px ui-monospace,monospace;border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--card);color:var(--ink)}
+#toast{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;z-index:30;max-width:90vw;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.on{opacity:1}
+@media(prefers-reduced-motion:reduce){#toast{transition:none}}
+@media(max-width:380px){.mnav b{min-width:96px;font-size:14px}.pair b{font-size:14px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="hd">
+    <h1>Finanças</h1>
+    <div class="mnav">
+      <button class="ib" data-act="prevM" aria-label="Mês anterior"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <b id="mlabel"></b>
+      <button class="ib" data-act="nextM" aria-label="Próximo mês"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+    </div>
+  </div>
+  <p id="mode">Carregando…</p>
+  <p id="note" hidden></p>
+</header>
+<main id="main"><p class="empty">Carregando seus dados…</p></main>
+<button class="fab" data-act="newTx" aria-label="Novo lançamento"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+<nav aria-label="Seções"><div>
+  <button data-tab="inicio"><svg viewBox="0 0 24 24"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>Início</button>
+  <button data-tab="lanc"><svg viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h9"/></svg>Lançamentos</button>
+  <button data-tab="contas"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/></svg>Contas</button>
+  <button data-tab="fixas"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Fixas</button>
+  <button data-tab="orc"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4v8l6 4"/></svg>Orçamento</button>
+</div></nav>
+<div id="sheet" hidden><div class="sh" role="dialog" aria-modal="true"></div></div>
+<div id="ask" hidden><div class="sh" role="alertdialog" aria-modal="true"><p style="font-size:17px;margin:4px 0 0"></p><div class="row"><button class="btn ghost" data-no>Cancelar</button><button class="btn" data-ok>Confirmar</button></div></div></div>
+<div id="toast" role="status"></div>
+<input type="file" id="restoreFile" accept=".json,application/json" hidden>
+<script>
+{
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const brl=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
+const money=v=>brl.format(Math.abs(v)<.005?0:v||0);
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const pad=n=>String(n).padStart(2,'0');
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+const ym=d=>d.slice(0,7);
+const addMonths=(m,n)=>{let[y,mo]=m.split('-').map(Number);mo+=n;y+=Math.floor((mo-1)/12);mo=((mo-1)%12+12)%12+1;return y+'-'+pad(mo)};
+const dim=m=>{const[y,mo]=m.split('-').map(Number);return new Date(y,mo,0).getDate()};
+const mkDate=(m,d)=>m+'-'+pad(Math.min(Math.max(1,d),dim(m)));
+const MES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const MESF=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const SEM=['dom','seg','ter','qua','qui','sex','sáb'];
+const mLabel=m=>MESF[+m.slice(5)-1]+' '+m.slice(0,4);
+const fmtD=d=>d.slice(8)+'/'+d.slice(5,7);
+const days=d=>Math.round((new Date(d+'T12:00')-new Date(today()+'T12:00'))/864e5);
+const r2=v=>Math.round(v*100)/100;
+const num=s=>{s=String(s??'').trim().replace(/[R$\s ]/g,'');if(/,\d{1,2}$/.test(s))s=s.replace(/\./g,'').replace(',','.');else s=s.replace(/,/g,'');const v=parseFloat(s);return isFinite(v)?v:NaN};
+const norm2=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+const norm=s=>norm2(s).replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim().split(' ').slice(0,3).join(' ');
+const PAL=['#2f9e6b','#3b7dd8','#d9822b','#c2417a','#7a5af5','#1aa3a3','#b39a1f','#e5484d','#5b6b73','#8a5a3c','#4caf50','#9c6ade'];
+const DEF_CATS=[['moradia','Moradia','d'],['mercado','Mercado','d'],['comer','Alimentação fora','d'],['transp','Transporte','d'],['saude','Saúde','d'],['educ','Educação','d'],['lazer','Lazer','d'],['assin','Assinaturas','d'],['compras','Compras','d'],['casa','Contas da casa','d'],['outros','Outros','d'],['salario','Salário','r'],['extra','Renda extra','r'],['rend','Rendimentos','r'],['outrosr','Outras receitas','r']].map(([id,name,kind],i)=>({id,name,kind,color:PAL[i%PAL.length]}));
+const KW=[[/ifood|restaur|lanch|padaria|bar |pizz|burger|cafe/,'comer'],[/uber|99 ?pop|99app|posto|combust|shell|ipiranga|estacion|pedagio|metro|onibus/,'transp'],[/mercado|supermerc|atacad|carrefour|assai|extra hiper|pao de acucar|hortifrut/,'mercado'],[/farmac|drogaria|droga|raia|hospital|clinica|laborat|unimed/,'saude'],[/netflix|spotify|prime video|amazon prime|disney|youtube|hbo|max |apple\.com|icloud|google one|deezer|globoplay/,'assin'],[/aluguel|condominio|iptu/,'moradia'],[/energia|enel|cemig|copel|light|sabesp|agua|gas |internet|vivo|claro|tim |oi /,'casa'],[/escola|faculdade|curso|udemy|livraria/,'educ'],[/cinema|ingresso|show|steam|playstation|xbox/,'lazer'],[/salario|salário|folha|pagto sal/,'salario'],[/rendimento|juros|dividend|rend pago/,'rend']];
+
+const S={cfg:null,months:{},month:ym(today()),tab:'inicio',q:'',mode:'',loaded:false,note:''};
+let store=null;const saving={},dirty={};
+
+const cfg=()=>S.cfg||{accounts:[],cats:DEF_CATS,budgets:{},recur:[],rules:{}};
+function ensureCfg(){if(!S.cfg)S.cfg=JSON.parse(JSON.stringify(cfg()));const c=S.cfg;c.accounts=c.accounts||[];c.cats=c.cats||JSON.parse(JSON.stringify(DEF_CATS));c.budgets=c.budgets||{};c.recur=c.recur||[];c.rules=c.rules||{};return c}
+const catOf=id=>cfg().cats.find(c=>c.id===id)||{name:'Sem categoria',color:'#8a8f8c',kind:'d'};
+const accOf=id=>cfg().accounts.find(a=>a.id===id);
+const accName=id=>(accOf(id)||{name:'Conta removida'}).name;
+const monthTx=m=>S.months[m]||[];
+const allTx=()=>Object.values(S.months).flat();
+
+async function save(k){
+  if(!store)return;
+  if(saving[k]){dirty[k]=1;return}
+  saving[k]=1;
+  try{do{dirty[k]=0;
+    if(k==='config')await store.set(k,JSON.parse(JSON.stringify(S.cfg)));
+    else{const tx=S.months[k.slice(2)]||[];if(tx.length)await store.set(k,{tx:JSON.parse(JSON.stringify(tx))});else{delete S.months[k.slice(2)];await store.del(k)}}
+  }while(dirty[k])}
+  catch(e){toast(e&&e.code==='quota_exceeded'?'Espaço cheio. Exporte um backup e apague meses antigos.':'Não consegui salvar ('+((e&&e.code)||'erro')+'). Tente de novo.')}
+  saving[k]=0;
+}
+function putTx(t){const k=ym(t.date);(S.months[k]=S.months[k]||[]).push(t);save('m-'+k)}
+function findTx(id){for(const k in S.months){const t=S.months[k].find(x=>x.id===id);if(t)return t}return null}
+function removeTx(id){for(const k in S.months){const i=S.months[k].findIndex(x=>x.id===id);if(i>=0){S.months[k].splice(i,1);save('m-'+k);return}}}
+function learn(desc,cat){const k=norm(desc);if(!k||!cat)return;const c=ensureCfg();if(c.rules[k]!==cat){c.rules[k]=cat;save('config')}}
+function guessCat(desc,kind){const c=cfg();const r=c.rules[norm(desc)];const ok=id=>{const x=c.cats.find(cc=>cc.id===id);return x&&x.kind===kind};
+  if(r&&ok(r))return r;const n=' '+norm2(desc)+' ';for(const[re,id]of KW)if(re.test(n)&&ok(id))return id;
+  const first=c.cats.find(cc=>cc.kind===kind&&/^outr/i.test(norm2(cc.name)))||c.cats.find(cc=>cc.kind===kind);return first?first.id:''}
+
+function totals(m){let r=0,d=0;for(const t of monthTx(m)){if(t.kind==='r')r+=t.amt;else if(t.kind==='d')d+=t.amt}return{r:r2(r),d:r2(d)}}
+function spent(m){const o={};for(const t of monthTx(m))if(t.kind==='d')o[t.cat]=(o[t.cat]||0)+t.amt;return o}
+function byCat(m){const o=spent(m);return Object.entries(o).map(([id,v])=>({c:catOf(id),v:r2(v)})).sort((a,b)=>b.v-a.v)}
+function balance(a){let b=+a.initial||0;for(const t of allTx()){if(t.acc===a.id)b+=t.kind==='r'?t.amt:-t.amt;if(t.kind==='t'&&t.to===a.id)b+=t.amt}return r2(b)}
+const fatMonth=(t,card)=>+t.date.slice(8)>(+card.closeDay||31)?addMonths(ym(t.date),1):ym(t.date);
+function fatura(card,M){let v=0;for(const t of allTx())if(t.acc===card.id&&t.kind!=='t'&&fatMonth(t,card)===M)v+=t.kind==='d'?t.amt:-t.amt;return r2(v)}
+const fatDue=(card,M)=>(+card.dueDay||10)>(+card.closeDay||31)?mkDate(M,+card.dueDay||10):mkDate(addMonths(M,1),+card.dueDay||10);
+const fatPaid=(card,M)=>allTx().some(t=>t.fat===card.id+'|'+M);
+const recPaid=(r,M)=>monthTx(M).some(t=>t.rid===r.id);
+
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('on'),2600)}
+function sheet(html){const s=$('#sheet');s.querySelector('.sh').innerHTML=html;s.hidden=false;const f=s.querySelector('input:not([type=radio]):not([type=hidden]),select');if(f&&matchMedia('(min-width:700px)').matches)f.focus()}
+function closeSheet(){$('#sheet').hidden=true;$('#sheet .sh').innerHTML=''}
+function ask(msg,ok){return new Promise(res=>{const d=$('#ask');d.querySelector('p').textContent=msg;const y=d.querySelector('[data-ok]');y.textContent=ok||'Confirmar';d.hidden=false;const done=v=>{d.hidden=true;res(v)};y.onclick=()=>done(true);d.querySelector('[data-no]').onclick=()=>done(false)})}
+const accOpts=(sel,filter)=>cfg().accounts.filter(filter||(()=>1)).map(a=>`<option value="${esc(a.id)}" ${a.id===sel?'selected':''}>${esc(a.name)}${a.type==='cartao'?' (cartão)':''}</option>`).join('');
+const dayLabel=d=>{const dt=new Date(d+'T12:00');const n=days(d);return(n===0?'Hoje':n===-1?'Ontem':SEM[dt.getDay()])+', '+fmtD(d)};
+const curM=()=>ym(today());
+
+function alerts(m){const c=cfg(),out=[],sp=spent(m);
+  for(const cat of c.cats){const b=+c.budgets[cat.id]||0;if(!b)continue;const s=sp[cat.id]||0;
+    if(s>b)out.push(`<li class="bad"><span>${esc(cat.name)} passou do orçamento: ${money(s)} de ${money(b)}</span></li>`);
+    else if(s>=.8*b)out.push(`<li><span>${esc(cat.name)} já usou ${Math.round(s/b*100)}% do orçamento</span></li>`)}
+  if(m===curM()){for(const r of c.recur){if(recPaid(r,m))continue;const n=days(mkDate(m,+r.day));
+    if(n<0)out.push(`<li class="bad"><span>${esc(r.name)} venceu há ${-n} dia${n===-1?'':'s'} · ${money(r.amount)}</span><button class="btn sm" data-act="payRec" data-id="${esc(r.id)}">Pagar</button></li>`);
+    else if(n<=5)out.push(`<li><span>${esc(r.name)} ${n===0?'vence hoje':'vence em '+n+' dia'+(n===1?'':'s')} · ${money(r.amount)}</span><button class="btn sm" data-act="payRec" data-id="${esc(r.id)}">Pagar</button></li>`)}
+    for(const a of c.accounts.filter(a=>a.type==='cartao'))for(const M of[addMonths(m,-1),m]){const due=fatDue(a,M),n=days(due),v=fatura(a,M);
+      if(v>0&&!fatPaid(a,M)&&n<=7&&n>=-20)out.push(`<li class="${n<0?'bad':''}"><span>Fatura ${esc(a.name)} ${n<0?'venceu dia '+fmtD(due):n===0?'vence hoje':'vence dia '+fmtD(due)} · ${money(v)}</span><button class="btn sm" data-act="payFat" data-id="${esc(a.id+'|'+M)}">Pagar</button></li>`)}}
+  return out}
+
+function vHome(){const m=S.month,{r,d}=totals(m),left=r2(r-d),c=cfg();
+  const tot=c.accounts.filter(a=>a.type!=='cartao').reduce((s,a)=>s+balance(a),0);
+  const cats=byCat(m),max=Math.max(1,...cats.map(x=>x.v)),al=alerts(m);
+  const hist=[0,1,2,3,4,5].map(i=>addMonths(m,i-5)).map(k=>({k,...totals(k)})),hm=Math.max(1,...hist.flatMap(h=>[h.r,h.d]));
+  return `<section class="hero"><span class="lbl">${left<0?'Faltou':'Sobrou'} em ${MESF[+m.slice(5)-1].toLowerCase()}</span><p class="big num${left<0?' neg':''}">${money(left)}</p>
+  <div class="pair"><div><span class="lbl">Receitas</span><b>${money(r)}</b></div><div><span class="lbl">Despesas</span><b>${money(d)}</b></div><div><span class="lbl">Saldo em contas</span><b>${money(tot)}</b></div></div></section>
+  ${!c.accounts.length?`<div class="callout"><span>Comece cadastrando uma conta ou cartão.</span><button class="btn" data-act="newAcc">Criar conta</button></div>`:''}
+  ${al.length?`<section class="blk"><h2>Atenção</h2><ul class="alerts">${al.join('')}</ul></section>`:''}
+  <section class="blk"><h2>Para onde foi o dinheiro</h2>${cats.length?`<ul class="bars">${cats.map(x=>`<li><span class="dot" style="background:${esc(x.c.color)}"></span><span class="nm">${esc(x.c.name)}</span><span class="v">${money(x.v)} <small style="color:var(--mute);font-weight:500">${d?Math.round(x.v/d*100):0}%</small></span><span class="track"><i style="width:${(x.v/max*100).toFixed(1)}%;background:${esc(x.c.color)}"></i></span></li>`).join('')}</ul>`:'<p class="empty">Nenhuma despesa neste mês ainda.</p>'}</section>
+  <section class="blk"><h2>Últimos 6 meses</h2><div class="cols">${hist.map(h=>`<div class="col" title="${esc(mLabel(h.k))}: receitas ${money(h.r)}, despesas ${money(h.d)}"><div class="pair2"><i class="in" style="height:${(h.r/hm*100).toFixed(1)}%"></i><i class="out" style="height:${(h.d/hm*100).toFixed(1)}%"></i></div><span>${MES[+h.k.slice(5)-1]}</span></div>`).join('')}</div><p class="legend"><i class="in" style="margin:0"></i>Receitas<i class="out"></i>Despesas</p></section>`}
+
+function txRow(t){const c=catOf(t.cat);const tr=t.kind==='t';
+  const sub=tr?accName(t.acc)+' → '+accName(t.to):c.name+' · '+accName(t.acc);
+  return `<li><button class="tx" data-act="editTx" data-id="${esc(t.id)}"><span class="dot" style="background:${tr?'var(--mute)':esc(c.color)}"></span><span class="t1">${esc(t.desc||(tr?'Transferência':c.name))}</span><span class="amt ${t.kind==='d'?'neg':t.kind==='r'?'pos':''}">${t.kind==='d'?'−':t.kind==='r'?'+':''}${money(t.amt)}</span><span class="t2">${esc(sub)}</span></button></li>`}
+function vTx(){const m=S.month,q=norm2(S.q).trim();let list=monthTx(m).slice().sort((a,b)=>b.date.localeCompare(a.date));
+  if(q)list=list.filter(t=>norm2(t.desc+' '+catOf(t.cat).name+' '+accName(t.acc)).includes(q));
+  const{r,d}=totals(m),g={};list.forEach(t=>(g[t.date]=g[t.date]||[]).push(t));
+  return `<div class="toolbar"><input id="q" type="search" placeholder="Buscar neste mês" value="${esc(S.q)}" aria-label="Buscar lançamentos"><button class="btn ghost" data-act="import">Importar extrato</button></div>
+  <p class="sum">Receitas <b class="pos">${money(r)}</b> · Despesas <b class="neg">${money(d)}</b> · ${monthTx(m).length} lançamentos</p>
+  ${list.length?Object.keys(g).map(k=>`<h3 class="day">${dayLabel(k)}</h3><ul class="txs">${g[k].map(txRow).join('')}</ul>`).join(''):`<p class="empty">${q?'Nada encontrado.':'Nenhum lançamento em '+esc(mLabel(m))+'. Toque em + para lançar ou importe um extrato OFX/CSV.'}</p>`}`}
+
+function vAcc(){const c=cfg();
+  const contas=c.accounts.filter(a=>a.type!=='cartao'),cards=c.accounts.filter(a=>a.type==='cartao');
+  const accCard=a=>`<div class="card"><div class="top"><b>${esc(a.name)}</b><button class="btn ghost sm" data-act="editAcc" data-id="${esc(a.id)}">Editar</button></div><p class="bal ${balance(a)<0?'neg':''}">${money(balance(a))}</p><p class="meta">Saldo atual</p></div>`;
+  const cardCard=a=>{const M=S.month===curM()?fatMonth({date:today()},a):S.month,v=fatura(a,M),due=fatDue(a,M),paid=fatPaid(a,M),n=days(due);
+    return `<div class="card"><div class="top"><b>${esc(a.name)}</b><button class="btn ghost sm" data-act="editAcc" data-id="${esc(a.id)}">Editar</button></div><p class="bal">${money(v)}</p><p class="meta">Fatura de ${MESF[+M.slice(5)-1].toLowerCase()} · fecha dia ${esc(a.closeDay)} · vence ${fmtD(due)}</p>
+    <div class="act">${paid?'<span class="chip ok">Paga</span>':v>0?`<span class="chip ${n<0?'bad':n<=7?'warn':''}">${n<0?'Vencida':n===0?'Vence hoje':'Em aberto'}</span><button class="btn sm" data-act="payFat" data-id="${esc(a.id+'|'+M)}">Pagar fatura</button>`:'<span class="chip">Sem gastos</span>'}</div></div>`};
+  return `<div class="sec" style="margin-top:0"><div class="hdr"><h2>Contas</h2><button class="btn ghost sm" data-act="newAcc">Nova conta</button></div>${contas.length?contas.map(accCard).join(''):'<p class="empty">Nenhuma conta ainda. Cadastre sua conta corrente, poupança ou carteira.</p>'}</div>
+  <div class="sec"><div class="hdr"><h2>Cartões</h2><button class="btn ghost sm" data-act="newCard">Novo cartão</button></div>${cards.length?cards.map(cardCard).join(''):'<p class="empty">Nenhum cartão cadastrado.</p>'}</div>
+  <div class="sec"><div class="hdr"><h2>Backup</h2></div><p class="hint">Guarde uma cópia dos seus dados de vez em quando. O arquivo também serve para levar tudo para outro lugar.</p><div class="toolbar"><button class="btn ghost" data-act="exportBk">Exportar backup</button><button class="btn ghost" data-act="restoreBk">Restaurar backup</button></div></div>`}
+
+function vRec(){const c=cfg(),M=S.month,list=c.recur.slice().sort((a,b)=>a.day-b.day);
+  const tot=list.filter(r=>r.kind!=='r').reduce((s,r)=>s+(+r.amount||0),0);
+  return `<div class="sec" style="margin-top:0"><div class="hdr"><h2>Contas fixas de ${MESF[+M.slice(5)-1].toLowerCase()}</h2><button class="btn ghost sm" data-act="newRec">Nova</button></div>
+  ${list.length?`<p class="sum" style="margin:0 0 12px">Total fixo de despesas: <b>${money(tot)}</b> por mês</p>`+list.map(r=>{const paid=recPaid(r,M),due=mkDate(M,+r.day),n=days(due);
+    const st=paid?'<span class="chip ok">Pago</span>':n<0?'<span class="chip bad">Vencida</span>':n<=5?`<span class="chip warn">${n===0?'Vence hoje':'Vence em '+n+'d'}</span>`:'<span class="chip">A vencer</span>';
+    return `<div class="card"><div class="top"><span class="dot" style="background:${esc(catOf(r.cat).color)}"></span><b>${esc(r.name)}</b><button class="btn ghost sm" data-act="editRec" data-id="${esc(r.id)}">Editar</button></div><p class="bal ${r.kind==='r'?'pos':''}">${money(+r.amount)}</p><p class="meta">Todo dia ${esc(r.day)} · ${esc(catOf(r.cat).name)} · ${esc(accName(r.acc))}</p><div class="act">${st}${paid?'':`<button class="btn sm" data-act="payRec" data-id="${esc(r.id)}">${r.kind==='r'?'Recebi':'Pagar'}</button>`}</div></div>`}).join(''):'<p class="empty">Cadastre aluguel, assinaturas, escola, salário… Elas aparecem todo mês com o status de pagamento e um aviso quando estão perto de vencer.</p>'}</div>`}
+
+function vBud(){const c=cfg(),M=S.month,sp=spent(M);const ds=c.cats.filter(x=>x.kind==='d'),rs=c.cats.filter(x=>x.kind==='r');
+  const tb=ds.reduce((s,x)=>s+(+c.budgets[x.id]||0),0),ts=ds.filter(x=>+c.budgets[x.id]).reduce((s,x)=>s+(sp[x.id]||0),0);
+  const row=x=>{const b=+c.budgets[x.id]||0,s=r2(sp[x.id]||0),p=b?s/b:0,col=p>1?'var(--neg)':p>=.8?'var(--warn)':esc(x.color);
+    return `<button class="bud" data-act="editCat" data-id="${esc(x.id)}"><span class="dot" style="background:${esc(x.color)}"></span><span class="t1">${esc(x.name)}</span><span class="amt ${p>1?'neg':''}">${money(s)}</span>${b?`<span class="track"><i style="width:${Math.min(100,p*100).toFixed(1)}%;background:${col}"></i></span><small>${p>1?'Passou '+money(s-b)+' do limite de '+money(b):'Restam '+money(b-s)+' de '+money(b)}</small>`:'<small>Sem orçamento · toque para definir</small>'}</button>`};
+  return `<div class="sec" style="margin-top:0"><div class="hdr"><h2>Orçamento de ${MESF[+M.slice(5)-1].toLowerCase()}</h2><button class="btn ghost sm" data-act="newCat">Nova categoria</button></div>
+  ${tb?`<p class="sum" style="margin:0 0 6px">Gasto nas categorias com limite: <b class="${ts>tb?'neg':''}">${money(ts)}</b> de <b>${money(tb)}</b></p>`:'<p class="hint">Toque numa categoria para definir um limite mensal. Você recebe um aviso no Início quando chegar a 80% e quando passar.</p>'}
+  ${ds.map(row).join('')}</div>
+  <div class="sec"><div class="hdr"><h2>Categorias de receita</h2></div>${rs.map(x=>`<button class="bud" data-act="editCat" data-id="${esc(x.id)}"><span class="dot" style="background:${esc(x.color)}"></span><span class="t1">${esc(x.name)}</span><span class="amt pos">${money(monthTx(M).filter(t=>t.kind==='r'&&t.cat===x.id).reduce((s,t)=>s+t.amt,0))}</span></button>`).join('')}</div>`}
+
+function render(){
+  $('#mlabel').textContent=mLabel(S.month);
+  document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-current',b.dataset.tab===S.tab?'page':'false'));
+  $('#mode').textContent=S.mode==='nuvem'?'Salvo na sua conta Claude, só você vê':S.mode==='local'?'Dados salvos neste aparelho'+(S.bk?' · último backup '+S.bk.split('-').reverse().join('/'):' · faça um backup na aba Contas'):'Carregando…';
+  $('#note').textContent=S.note;$('#note').hidden=!S.note;
+  if(!S.loaded)return;
+  $('#main').innerHTML=({inicio:vHome,lanc:vTx,contas:vAcc,fixas:vRec,orc:vBud})[S.tab]();
+}
+
+function openTx(t,pre){const c=cfg();if(!c.accounts.length){toast('Cadastre uma conta primeiro.');openAcc(null,'conta');return}
+  const isNew=!t,x=t?{...t}:{id:uid(),kind:'d',amt:'',desc:'',date:S.month===curM()?today():S.month+'-01',cat:'',acc:c.accounts[0].id,to:'',...pre};
+  if(!x.to)x.to=(c.accounts.find(a=>a.id!==x.acc)||{}).id||'';
+  sheet(`<form id="f" novalidate><h2>${isNew?'Novo lançamento':'Editar lançamento'}</h2>
+  <div class="seg">${[['d','Despesa'],['r','Receita'],['t','Transferência']].map(([k,l])=>`<label><input type="radio" name="kind" value="${k}" ${x.kind===k?'checked':''}><span>${l}</span></label>`).join('')}</div>
+  <div class="two"><label class="fld"><span>Valor (R$)</span><input name="amt" inputmode="decimal" autocomplete="off" value="${x.amt===''?'':esc(String(x.amt).replace('.',','))}" placeholder="0,00"></label>
+  <label class="fld"><span>Data</span><input name="date" type="date" value="${esc(x.date)}"></label></div>
+  <label class="fld"><span>Descrição</span><input name="desc" value="${esc(x.desc)}" maxlength="80" autocomplete="off" placeholder="Ex.: Mercado do mês"></label>
+  <label class="fld" data-k="cat"><span>Categoria</span><select name="cat"></select></label>
+  <label class="fld"><span data-k="accl">Conta ou cartão</span><select name="acc">${accOpts(x.acc)}</select></label>
+  <label class="fld" data-k="to"><span>Para a conta</span><select name="to">${accOpts(x.to)}</select></label>
+  ${isNew?'<label class="fld" data-k="parc"><span>Parcelas</span><input name="parc" type="number" min="1" max="48" value="1" inputmode="numeric"></label>':''}
+  ${x.inst?`<p class="hint">Parcela ${esc(x.inst)}. Alterar aqui muda só esta parcela.</p>`:''}
+  <div class="row">${isNew?'':'<button type="button" class="btn danger" id="del">Excluir</button>'}<button type="button" class="btn ghost" data-act="close">Cancelar</button><button class="btn">Salvar</button></div></form>`);
+  const f=$('#f'),q=k=>f.querySelector(`[data-k="${k}"]`);
+  const sync=()=>{const k=f.kind.value;q('cat').hidden=k==='t';q('to').hidden=k!=='t';q('accl').textContent=k==='t'?'Da conta':'Conta ou cartão';
+    const cur=f.cat.value||x.cat,want=k==='r'?'r':'d',opts=c.cats.filter(cc=>cc.kind===want);
+    f.cat.innerHTML=opts.map(cc=>`<option value="${esc(cc.id)}" ${cc.id===cur?'selected':''}>${esc(cc.name)}</option>`).join('');
+    if(!opts.some(o=>o.id===cur))f.cat.value=guessCat(f.desc.value,want)||(opts[0]||{}).id||'';
+    const p=q('parc');if(p){const a=accOf(f.acc.value);p.hidden=!(k==='d'&&a&&a.type==='cartao')}};
+  f.addEventListener('change',e=>{if(e.target.name==='kind'||e.target.name==='acc')sync()});
+  f.desc.addEventListener('change',()=>{if(isNew&&f.kind.value!=='t'){const g=guessCat(f.desc.value,f.kind.value);if(g)f.cat.value=g}});
+  sync();
+  f.onsubmit=e=>{e.preventDefault();const amt=num(f.amt.value);if(!(amt>0)){toast('Informe um valor maior que zero.');f.amt.focus();return}
+    if(!f.date.value){toast('Informe a data.');return}
+    const k=f.kind.value,nt={id:x.id,kind:k,amt:r2(amt),desc:f.desc.value.trim(),date:f.date.value,acc:f.acc.value};
+    if(k==='t'){if(f.to.value===nt.acc||!f.to.value){toast('Escolha duas contas diferentes.');return}nt.to=f.to.value}else nt.cat=f.cat.value;
+    for(const p of['rid','fat','fitid','inst'])if(x[p])nt[p]=x[p];
+    const pp=q('parc'),n=isNew&&pp&&!pp.hidden?Math.max(1,Math.min(48,parseInt(f.parc.value)||1)):1;
+    if(n>1){const each=Math.floor(nt.amt/n*100)/100,first=r2(nt.amt-each*(n-1)),day=+nt.date.slice(8),base=nt.desc||catOf(nt.cat).name;
+      for(let i=0;i<n;i++)putTx({...nt,id:uid(),amt:i?each:first,date:mkDate(addMonths(ym(nt.date),i),day),desc:`${base} (${i+1}/${n})`,inst:`${i+1}/${n}`})}
+    else{if(!isNew)removeTx(x.id);putTx(nt)}
+    if(k!=='t'&&nt.desc)learn(nt.desc,nt.cat);
+    closeSheet();render();toast(n>1?n+' parcelas lançadas.':isNew?'Lançamento salvo.':'Alterações salvas.')};
+  const del=$('#del');if(del)del.onclick=async()=>{if(await ask('Excluir este lançamento?','Excluir')){removeTx(x.id);closeSheet();render();toast('Lançamento excluído.')}};
+}
+
+function openAcc(a,type){const isNew=!a,x=a?{...a}:{id:uid(),name:'',type:type||'conta',initial:0,closeDay:'',dueDay:''};
+  sheet(`<form id="f" novalidate><h2>${isNew?(x.type==='cartao'?'Novo cartão':'Nova conta'):'Editar '+(x.type==='cartao'?'cartão':'conta')}</h2>
+  <div class="seg s2">${[['conta','Conta'],['cartao','Cartão de crédito']].map(([k,l])=>`<label><input type="radio" name="type" value="${k}" ${x.type===k?'checked':''}><span>${l}</span></label>`).join('')}</div>
+  <label class="fld"><span>Nome</span><input name="name" value="${esc(x.name)}" maxlength="40" placeholder="Ex.: Nubank, Itaú, Carteira"></label>
+  <label class="fld" data-k="ini"><span>Saldo inicial (R$)</span><input name="initial" inputmode="decimal" value="${esc(String(x.initial||0).replace('.',','))}"></label>
+  <div class="two" data-k="cc"><label class="fld"><span>Dia do fechamento</span><input name="closeDay" type="number" min="1" max="31" inputmode="numeric" value="${esc(x.closeDay)}"></label><label class="fld"><span>Dia do vencimento</span><input name="dueDay" type="number" min="1" max="31" inputmode="numeric" value="${esc(x.dueDay)}"></label></div>
+  <p class="hint" data-k="cch">Compras depois do fechamento entram na fatura do mês seguinte.</p>
+  <div class="row">${isNew?'':'<button type="button" class="btn danger" id="del">Excluir</button>'}<button type="button" class="btn ghost" data-act="close">Cancelar</button><button class="btn">Salvar</button></div></form>`);
+  const f=$('#f'),sync=()=>{const cc=f.type.value==='cartao';f.querySelector('[data-k=ini]').hidden=cc;f.querySelector('[data-k=cc]').style.display=cc?'':'none';f.querySelector('[data-k=cch]').hidden=!cc};
+  f.addEventListener('change',sync);sync();
+  f.onsubmit=e=>{e.preventDefault();const name=f.name.value.trim();if(!name){toast('Dê um nome.');return}
+    const na={id:x.id,name,type:f.type.value};
+    if(na.type==='cartao'){const cd=parseInt(f.closeDay.value),dd=parseInt(f.dueDay.value);if(!(cd>=1&&cd<=31&&dd>=1&&dd<=31)){toast('Informe os dias de fechamento e vencimento.');return}na.closeDay=cd;na.dueDay=dd;na.initial=0}
+    else{const v=num(f.initial.value||'0');na.initial=isFinite(v)?r2(v):0}
+    const c=ensureCfg(),i=c.accounts.findIndex(y=>y.id===x.id);if(i>=0)c.accounts[i]=na;else c.accounts.push(na);
+    save('config');closeSheet();render();toast('Salvo.')};
+  const del=$('#del');if(del)del.onclick=async()=>{if(allTx().some(t=>t.acc===x.id||t.to===x.id)||cfg().recur.some(r=>r.acc===x.id)){toast('Essa conta tem lançamentos ou contas fixas. Mova ou apague antes.');return}
+    if(await ask('Excluir "'+x.name+'"?','Excluir')){const c=ensureCfg();c.accounts=c.accounts.filter(y=>y.id!==x.id);save('config');closeSheet();render()}};
+}
+
+function openRec(r){const c=cfg();if(!c.accounts.length){toast('Cadastre uma conta primeiro.');openAcc(null,'conta');return}
+  const isNew=!r,x=r?{...r}:{id:uid(),name:'',amount:'',day:10,kind:'d',cat:'',acc:c.accounts[0].id};
+  sheet(`<form id="f" novalidate><h2>${isNew?'Nova conta fixa':'Editar conta fixa'}</h2>
+  <div class="seg s2">${[['d','Despesa'],['r','Receita']].map(([k,l])=>`<label><input type="radio" name="kind" value="${k}" ${x.kind===k?'checked':''}><span>${l}</span></label>`).join('')}</div>
+  <label class="fld"><span>Nome</span><input name="name" value="${esc(x.name)}" maxlength="50" placeholder="Ex.: Aluguel, Netflix, Salário"></label>
+  <div class="two"><label class="fld"><span>Valor (R$)</span><input name="amount" inputmode="decimal" value="${x.amount===''?'':esc(String(x.amount).replace('.',','))}" placeholder="0,00"></label><label class="fld"><span>Dia do mês</span><input name="day" type="number" min="1" max="31" inputmode="numeric" value="${esc(x.day)}"></label></div>
+  <label class="fld"><span>Categoria</span><select name="cat"></select></label>
+  <label class="fld"><span>Conta ou cartão</span><select name="acc">${accOpts(x.acc)}</select></label>
+  <p class="hint">Se o valor muda todo mês (luz, água), use uma média. Na hora de pagar você ajusta.</p>
+  <div class="row">${isNew?'':'<button type="button" class="btn danger" id="del">Excluir</button>'}<button type="button" class="btn ghost" data-act="close">Cancelar</button><button class="btn">Salvar</button></div></form>`);
+  const f=$('#f'),sync=()=>{const k=f.kind.value,cur=f.cat.value||x.cat,o=c.cats.filter(cc=>cc.kind===k);f.cat.innerHTML=o.map(cc=>`<option value="${esc(cc.id)}" ${cc.id===cur?'selected':''}>${esc(cc.name)}</option>`).join('')};
+  f.addEventListener('change',e=>{if(e.target.name==='kind')sync()});f.name.addEventListener('change',()=>{if(isNew){const g=guessCat(f.name.value,f.kind.value);if(g)f.cat.value=g}});sync();
+  f.onsubmit=e=>{e.preventDefault();const name=f.name.value.trim(),amount=num(f.amount.value),day=parseInt(f.day.value);
+    if(!name||!(amount>0)||!(day>=1&&day<=31)){toast('Preencha nome, valor e dia.');return}
+    const nr={id:x.id,name,amount:r2(amount),day,kind:f.kind.value,cat:f.cat.value,acc:f.acc.value};
+    const cc=ensureCfg(),i=cc.recur.findIndex(y=>y.id===x.id);if(i>=0)cc.recur[i]=nr;else cc.recur.push(nr);
+    save('config');closeSheet();render();toast('Conta fixa salva.')};
+  const del=$('#del');if(del)del.onclick=async()=>{if(await ask('Excluir a conta fixa "'+x.name+'"? Os pagamentos já lançados continuam.','Excluir')){const cc=ensureCfg();cc.recur=cc.recur.filter(y=>y.id!==x.id);save('config');closeSheet();render()}};
+}
+
+function openCat(cat,kind){const c=cfg(),isNew=!cat,x=cat?{...cat}:{id:uid(),name:'',kind:kind||'d',color:PAL[c.cats.length%PAL.length]};
+  sheet(`<form id="f" novalidate><h2>${isNew?'Nova categoria':'Categoria'}</h2>
+  ${isNew?`<div class="seg s2">${[['d','Despesa'],['r','Receita']].map(([k,l])=>`<label><input type="radio" name="kind" value="${k}" ${x.kind===k?'checked':''}><span>${l}</span></label>`).join('')}</div>`:''}
+  <label class="fld"><span>Nome</span><input name="name" value="${esc(x.name)}" maxlength="30"></label>
+  <label class="fld" data-k="bud"><span>Orçamento mensal (R$)</span><input name="bud" inputmode="decimal" placeholder="Sem limite" value="${+c.budgets[x.id]?esc(String(c.budgets[x.id]).replace('.',',')):''}"></label>
+  <div class="fld"><span>Cor</span><div class="sw">${PAL.map(p=>`<label><input type="radio" name="color" value="${p}" ${p===x.color?'checked':''} aria-label="Cor ${p}"><span style="background:${p}"></span></label>`).join('')}</div></div>
+  <div class="row">${isNew?'':'<button type="button" class="btn danger" id="del">Excluir</button>'}<button type="button" class="btn ghost" data-act="close">Cancelar</button><button class="btn">Salvar</button></div></form>`);
+  const f=$('#f'),sync=()=>{f.querySelector('[data-k=bud]').hidden=(f.kind?f.kind.value:x.kind)!=='d'};f.addEventListener('change',sync);sync();
+  f.onsubmit=e=>{e.preventDefault();const name=f.name.value.trim();if(!name){toast('Dê um nome.');return}
+    const cc=ensureCfg(),nk=f.kind?f.kind.value:x.kind,nc={id:x.id,name,kind:nk,color:f.color.value||x.color},i=cc.cats.findIndex(y=>y.id===x.id);
+    if(i>=0)cc.cats[i]=nc;else cc.cats.push(nc);
+    const b=num(f.bud.value);if(nk==='d'&&b>0)cc.budgets[x.id]=r2(b);else delete cc.budgets[x.id];
+    save('config');closeSheet();render();toast('Categoria salva.')};
+  const del=$('#del');if(del)del.onclick=async()=>{if(allTx().some(t=>t.cat===x.id)||cfg().recur.some(r=>r.cat===x.id)){toast('Há lançamentos nessa categoria. Mude-os de categoria antes.');return}
+    if(await ask('Excluir a categoria "'+x.name+'"?','Excluir')){const cc=ensureCfg();cc.cats=cc.cats.filter(y=>y.id!==x.id);delete cc.budgets[x.id];save('config');closeSheet();render()}};
+}
+
+async function readText(file){const buf=await file.arrayBuffer();let t=new TextDecoder('utf-8').decode(buf);if(t.includes(String.fromCharCode(65533)))t=new TextDecoder('windows-1252').decode(buf);return t}
+const pDate=s=>{s=String(s||'').trim();let m=s.match(/^(\d{4})-?(\d{2})-?(\d{2})/);if(m)return`${m[1]}-${m[2]}-${m[3]}`;m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);if(m)return`${m[3].length===2?'20'+m[3]:m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;return null};
+function parseOFX(t){const out=[],parts=t.split(/<STMTTRN>/i).slice(1);
+  for(const p of parts){const b=p.split(/<\/STMTTRN>/i)[0],g=k=>{const x=b.match(new RegExp('<'+k+'>([^<\\r\\n]*)','i'));return x?x[1].trim():''};
+    const date=pDate(g('DTPOSTED')),amt=num(g('TRNAMT')),desc=(g('MEMO')||g('NAME')).replace(/\s+/g,' ');if(date&&isFinite(amt)&&amt)out.push({date,amt,desc,fitid:g('FITID')})}
+  return out}
+function parseCSV(t){const lines=t.split(/\r?\n/).filter(l=>l.trim());if(!lines.length)return[];
+  const sep=(lines[0].match(/;/g)||[]).length>=(lines[0].match(/,/g)||[]).length?';':',';
+  const split=l=>{const r=[];let cur='',q=false;for(const ch of l){if(ch==='"')q=!q;else if(ch===sep&&!q){r.push(cur);cur=''}else cur+=ch}r.push(cur);return r.map(v=>v.trim())};
+  const hi=lines.findIndex(l=>/data|date/i.test(l)&&/valor|amount|value/i.test(l));let col={d:0,s:1,v:2},start=0;
+  if(hi>=0){const h=split(lines[hi]).map(norm2);col={d:h.findIndex(v=>/data|date/.test(v)),s:h.findIndex(v=>/descri|hist|memo|lanc|estabelec|title|titulo|identific/.test(v)),v:h.findIndex(v=>/valor|amount|value/.test(v))};
+    if(col.s<0)col.s=h.findIndex((v,i)=>i!==col.d&&i!==col.v);start=hi+1}
+  return lines.slice(start).map(split).map(r=>({date:pDate(r[col.d]),amt:num(r[col.v]),desc:(r[col.s]||'').replace(/\s+/g,' ')})).filter(x=>x.date&&isFinite(x.amt)&&x.amt!==0)}
+
+function openImport(){const c=cfg();if(!c.accounts.length){toast('Cadastre uma conta primeiro.');openAcc(null,'conta');return}
+  sheet(`<form id="f" novalidate><h2>Importar extrato</h2><p class="hint">Use o arquivo OFX ou CSV que você baixa no app ou site do banco. Lançamentos repetidos são ignorados e as categorias são sugeridas pelo histórico.</p>
+  <label class="fld"><span>Conta ou cartão do extrato</span><select name="acc">${accOpts()}</select></label>
+  <label class="fld"><span>Arquivo</span><input type="file" name="file" accept=".ofx,.csv,.txt,text/csv,application/x-ofx"></label>
+  <label class="chk"><input type="checkbox" name="inv"> Valores positivos são gastos (comum no CSV de fatura de cartão)</label>
+  <div id="prev"></div><div class="row"><button type="button" class="btn ghost" data-act="close">Cancelar</button><button class="btn" id="go" disabled>Importar</button></div></form>`);
+  const f=$('#f');let rows=[],text='',ofx=false;
+  const setInv=()=>{const a=accOf(f.acc.value);f.inv.checked=!ofx&&!!a&&a.type==='cartao'};
+  const build=()=>{if(!text)return;let raw=ofx?parseOFX(text):parseCSV(text);if(f.inv.checked)raw=raw.map(r=>({...r,amt:-r.amt}));
+    const acc=f.acc.value,key=(d,a,s)=>'k'+d+'|'+a.toFixed(2)+'|'+norm2(s).trim(),ex=new Set();
+    for(const t of allTx())if(t.acc===acc){if(t.fitid)ex.add('f'+t.fitid);ex.add(key(t.date,t.amt,t.desc))}
+    rows=raw.map(r=>{const kind=r.amt<0?'d':'r',amt=r2(Math.abs(r.amt)),dup=(r.fitid&&ex.has('f'+r.fitid))||ex.has(key(r.date,amt,r.desc));return{...r,kind,amt,dup,cat:guessCat(r.desc,kind)}});
+    const nw=rows.filter(r=>!r.dup),dn=rows.length-nw.length;
+    $('#prev').innerHTML=rows.length?`<p class="hint"><b>${nw.length}</b> novos${dn?` · ${dn} já lançados (ignorados)`:''}</p><ul class="txs prev">${rows.slice(0,60).map(r=>`<li class="${r.dup?'dup':''}"><div class="tx" style="cursor:default"><span class="dot" style="background:${esc(catOf(r.cat).color)}"></span><span class="t1">${esc(r.desc||'(sem descrição)')}</span><span class="amt ${r.kind==='d'?'neg':'pos'}">${r.kind==='d'?'−':'+'}${money(r.amt)}</span><span class="t2">${fmtD(r.date)} · ${esc(catOf(r.cat).name)}</span></div></li>`).join('')}</ul>${rows.length>60?`<p class="hint">e mais ${rows.length-60}…</p>`:''}`:'<p class="hint bad">Não encontrei lançamentos nesse arquivo. Confira se é OFX ou CSV com colunas de data, descrição e valor.</p>';
+    const go=$('#go');go.disabled=!nw.length;go.textContent=nw.length?`Importar ${nw.length}`:'Importar'};
+  f.file.onchange=async()=>{const file=f.file.files[0];if(!file)return;try{text=await readText(file)}catch(e){toast('Não consegui ler o arquivo.');return}ofx=/OFXHEADER|<OFX>/i.test(text);setInv();build()};
+  f.acc.onchange=()=>{setInv();build()};f.inv.onchange=build;
+  f.onsubmit=e=>{e.preventDefault();const acc=f.acc.value,nw=rows.filter(r=>!r.dup),touched=new Set();if(!nw.length)return;
+    for(const r of nw){const t={id:uid(),kind:r.kind,amt:r.amt,desc:r.desc,date:r.date,acc,cat:r.cat};if(r.fitid)t.fitid=r.fitid;const k=ym(t.date);(S.months[k]=S.months[k]||[]).push(t);touched.add(k)}
+    touched.forEach(k=>save('m-'+k));const last=[...touched].sort().pop();if(last)S.month=last;closeSheet();S.tab='lanc';render();toast(nw.length+' lançamentos importados. Toque em um para mudar a categoria.')};
+}
+
+function markBk(){S.bk=today();try{localStorage.setItem('fin:lastbk',S.bk)}catch(e){}render()}
+async function exportBk(){const data=JSON.stringify({app:'controle-financeiro',version:1,exported:new Date().toISOString(),cfg:cfg(),months:S.months});
+  const name='financas-backup-'+today()+'.json';let dl=null;try{dl=typeof claude!=='undefined'?await claude.use('downloads'):null}catch(e){}
+  if(dl){try{await dl.save({filename:name,data});markBk();toast('Backup salvo.');return}catch(e){}}
+  try{const file=new File([data],name,{type:'application/json'});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});markBk();return}
+    const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);markBk();toast('Backup baixado.');return}catch(e){if(e&&e.name==='AbortError')return}
+  sheet(`<h2>Backup</h2><p class="hint">Copie o texto abaixo e guarde num arquivo ou nas Notas.</p><textarea readonly id="bk">${esc(data)}</textarea><div class="row"><button class="btn ghost" data-act="close">Fechar</button><button class="btn" id="cp">Copiar</button></div>`);
+  $('#cp').onclick=async()=>{try{await navigator.clipboard.writeText(data);toast('Copiado.')}catch(e){$('#bk').select();toast('Selecione e copie manualmente.')}}}
+async function restoreBk(file){let b;try{b=JSON.parse(await readText(file))}catch(e){toast('Arquivo inválido.');return}
+  if(!b||b.app!=='controle-financeiro'||!b.cfg||typeof b.months!=='object'){toast('Esse arquivo não é um backup deste app.');return}
+  if(!await ask('Restaurar o backup de '+String(b.exported||'').slice(0,10).split('-').reverse().join('/')+'? Os dados atuais serão substituídos.','Restaurar'))return;
+  const old=Object.keys(S.months);S.cfg=b.cfg;S.months={};for(const k in b.months)if(/^\d{4}-\d{2}$/.test(k)&&Array.isArray(b.months[k]))S.months[k]=b.months[k];
+  ensureCfg();save('config');new Set([...old,...Object.keys(S.months)]).forEach(k=>save('m-'+k));render();toast('Backup restaurado.')}
+
+const act={
+  prevM:()=>{S.month=addMonths(S.month,-1);render()},nextM:()=>{S.month=addMonths(S.month,1);render()},
+  newTx:()=>openTx(),editTx:id=>{const t=findTx(id);if(t)openTx(t)},
+  newAcc:()=>openAcc(null,'conta'),newCard:()=>openAcc(null,'cartao'),editAcc:id=>{const a=accOf(id);if(a)openAcc(a)},
+  newRec:()=>openRec(),editRec:id=>{const r=cfg().recur.find(x=>x.id===id);if(r)openRec(r)},
+  payRec:id=>{const r=cfg().recur.find(x=>x.id===id);if(!r)return;const M=S.month;openTx(null,{kind:r.kind,amt:r.amount,desc:r.name,cat:r.cat,acc:accOf(r.acc)?r.acc:cfg().accounts[0].id,rid:r.id,date:M===curM()?today():mkDate(M,+r.day)})},
+  payFat:id=>{const[cid,M]=id.split('|'),card=accOf(cid);if(!card)return;const from=cfg().accounts.find(a=>a.type!=='cartao');if(!from){toast('Cadastre a conta de onde sai o pagamento.');openAcc(null,'conta');return}
+    const due=fatDue(card,M);openTx(null,{kind:'t',amt:fatura(card,M),desc:'Fatura '+card.name+' '+MES[+M.slice(5)-1],acc:from.id,to:card.id,fat:id,date:due<today()?today():(ym(due)===S.month?due:today())})},
+  newCat:()=>openCat(),editCat:id=>{const c=cfg().cats.find(x=>x.id===id);if(c)openCat(c)},
+  import:()=>openImport(),exportBk:()=>exportBk(),restoreBk:()=>{const i=$('#restoreFile');i.value='';i.click()},
+  close:()=>closeSheet()
+};
+document.addEventListener('click',e=>{const t=e.target.closest('[data-tab]');if(t){S.tab=t.dataset.tab;render();scrollTo(0,0);return}
+  const b=e.target.closest('[data-act]');if(b&&act[b.dataset.act]){e.preventDefault();act[b.dataset.act](b.dataset.id)}
+  if(e.target.id==='sheet')closeSheet()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#sheet').hidden)closeSheet()});
+document.addEventListener('input',e=>{if(e.target.id==='q'){S.q=e.target.value;const pos=e.target.selectionStart;render();const q=$('#q');if(q){q.focus();try{q.setSelectionRange(pos,pos)}catch(_){}}}});
+$('#restoreFile').addEventListener('change',e=>{const f=e.target.files[0];if(f)restoreBk(f)});
+
+function useLocal(){S.mode='local';
+  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k||!k.startsWith('fin:')||k==='fin:lastbk')continue;const b=JSON.parse(localStorage.getItem(k)),id=k.slice(4);if(id==='config')S.cfg=b;else if(id.startsWith('m-')&&b&&Array.isArray(b.tx))S.months[id.slice(2)]=b.tx}}catch(e){}
+  try{S.bk=localStorage.getItem('fin:lastbk')||''}catch(e){}
+  try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+  store={set:async(k,b)=>{try{localStorage.setItem('fin:'+k,JSON.stringify(b))}catch(e){throw{code:e&&e.name==='QuotaExceededError'?'quota_exceeded':'erro'}}},del:async k=>{localStorage.removeItem('fin:'+k)}};
+  S.loaded=true;render()}
+
+if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
+render();
+(async()=>{let db=null,id=null;
+  try{if(typeof claude!=='undefined'){db=await claude.use('db');const u=await claude.use('user');id=u?await u.id():null}}catch(e){}
+  if(!db||!id){useLocal();return}
+  const col=db.collection('data/users/'+id);
+  store={set:(k,b)=>col.doc(k).set(b),del:k=>col.doc(k).delete()};S.mode='nuvem';render();
+  const tm=setTimeout(()=>{S.note=S.loaded?'Seus dados podem estar desatualizados, sem conexão no momento.':'Ainda não consegui carregar seus dados. Verifique a conexão.';render()},10000);
+  col.onSnapshot(snap=>{if(!snap.metadata.fromCache){clearTimeout(tm);S.note=''}
+    for(const ch of snap.docChanges()){const d=ch.doc,k=d.id;if(saving[k])continue;
+      if(ch.type==='removed'){if(k.startsWith('m-'))delete S.months[k.slice(2)];continue}
+      const b=d.data();if(!b)continue;if(k==='config')S.cfg=JSON.parse(JSON.stringify(b));else if(k.startsWith('m-'))S.months[k.slice(2)]=JSON.parse(JSON.stringify(b.tx||[]))}
+    if(!S.loaded||$('#sheet').hidden){S.loaded=true;render()}else S.loaded=true},
+  e=>{clearTimeout(tm);if(!S.loaded){useLocal();S.note='Não consegui acessar o armazenamento da conta ('+e.code+'). Usando este navegador.'}else S.note='Conexão com seus dados perdida. Recarregue a página.';render()});
+})();
+}
+</script>
+</body>
+</html>
