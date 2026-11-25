@@ -1,0 +1,16 @@
+name = "financas"
+main = "src/index.js"
+compatibility_date = "2025-06-01"
+workers_dev = true
+
+[vars]
+ALLOWED_ORIGINS = "https://geovannimartins12.github.io"
+VAPID_SUBJECT = "mailto:financas@users.noreply.github.com"
+
+[[kv_namespaces]]
+binding = "FIN"
+id = "__KV_ID__"
+
+[triggers]
+# 12:00 UTC = 9:00 em Brasília
+crons = ["0 12 * * *"]

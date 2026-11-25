@@ -89,6 +89,7 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:3px solid 
 .prev .dup{opacity:.4}
 .btn{height:44px;padding:0 16px;border-radius:12px;border:0;background:var(--ink);color:var(--bg);font-weight:600;cursor:pointer;white-space:nowrap}
 .btn.ghost{background:var(--card);color:var(--ink)}
+.card .btn.ghost{background:var(--bg)}
 .btn.sm{height:36px;padding:0 12px;font-size:14px}
 .btn.danger{background:none;color:var(--neg);margin-right:auto;padding:0 6px}
 .btn:disabled{opacity:.4}
@@ -172,6 +173,7 @@ textarea{width:100%;height:40vh;font:13px ui-monospace,monospace;border:1px soli
 <div id="ask" hidden><div class="sh" role="alertdialog" aria-modal="true"><p style="font-size:17px;margin:4px 0 0"></p><div class="row"><button class="btn ghost" data-no>Cancelar</button><button class="btn" data-ok>Confirmar</button></div></div></div>
 <div id="toast" role="status"></div>
 <input type="file" id="restoreFile" accept=".json,application/json" hidden>
+<script src="config.js"></script>
 <script>
 {
 const $=s=>document.querySelector(s);
@@ -217,7 +219,7 @@ async function save(k){
   try{do{dirty[k]=0;
     if(k==='config')await store.set(k,JSON.parse(JSON.stringify(S.cfg)));
     else{const tx=S.months[k.slice(2)]||[];if(tx.length)await store.set(k,{tx:JSON.parse(JSON.stringify(tx))});else{delete S.months[k.slice(2)];await store.del(k)}}
-  }while(dirty[k])}
+  }while(dirty[k]);markDirty(k)}
   catch(e){toast(e&&e.code==='quota_exceeded'?'Espaço cheio. Exporte um backup e apague meses antigos.':'Não consegui salvar ('+((e&&e.code)||'erro')+'). Tente de novo.')}
   saving[k]=0;
 }
@@ -287,7 +289,8 @@ function vAcc(){const c=cfg();
     <div class="act">${paid?'<span class="chip ok">Paga</span>':v>0?`<span class="chip ${n<0?'bad':n<=7?'warn':''}">${n<0?'Vencida':n===0?'Vence hoje':'Em aberto'}</span><button class="btn sm" data-act="payFat" data-id="${esc(a.id+'|'+M)}">Pagar fatura</button>`:'<span class="chip">Sem gastos</span>'}</div></div>`};
   return `<div class="sec" style="margin-top:0"><div class="hdr"><h2>Contas</h2><button class="btn ghost sm" data-act="newAcc">Nova conta</button></div>${contas.length?contas.map(accCard).join(''):'<p class="empty">Nenhuma conta ainda. Cadastre sua conta corrente, poupança ou carteira.</p>'}</div>
   <div class="sec"><div class="hdr"><h2>Cartões</h2><button class="btn ghost sm" data-act="newCard">Novo cartão</button></div>${cards.length?cards.map(cardCard).join(''):'<p class="empty">Nenhum cartão cadastrado.</p>'}</div>
-  <div class="sec"><div class="hdr"><h2>Backup</h2></div><p class="hint">Guarde uma cópia dos seus dados de vez em quando. O arquivo também serve para levar tudo para outro lugar.</p><div class="toolbar"><button class="btn ghost" data-act="exportBk">Exportar backup</button><button class="btn ghost" data-act="restoreBk">Restaurar backup</button></div></div>`}
+  ${vCloud()}
+  <div class="sec"><div class="hdr"><h2>Backup manual</h2></div><p class="hint">Guarde uma cópia dos seus dados de vez em quando. O arquivo também serve para levar tudo para outro lugar.</p><div class="toolbar"><button class="btn ghost" data-act="exportBk">Exportar backup</button><button class="btn ghost" data-act="restoreBk">Restaurar backup</button></div></div>`}
 
 function vRec(){const c=cfg(),M=S.month,list=c.recur.slice().sort((a,b)=>a.day-b.day);
   const tot=list.filter(r=>r.kind!=='r').reduce((s,r)=>s+(+r.amount||0),0);
@@ -308,7 +311,7 @@ function vBud(){const c=cfg(),M=S.month,sp=spent(M);const ds=c.cats.filter(x=>x.
 function render(){
   $('#mlabel').textContent=mLabel(S.month);
   document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-current',b.dataset.tab===S.tab?'page':'false'));
-  $('#mode').textContent=S.mode==='nuvem'?'Salvo na sua conta Claude, só você vê':S.mode==='local'?'Dados salvos neste aparelho'+(S.bk?' · último backup '+S.bk.split('-').reverse().join('/'):' · faça um backup na aba Contas'):'Carregando…';
+  $('#mode').textContent=S.mode==='nuvem'?'Salvo na sua conta Claude, só você vê':S.mode==='local'?cloudLine():'Carregando…';
   $('#note').textContent=S.note;$('#note').hidden=!S.note;
   if(!S.loaded)return;
   $('#main').innerHTML=({inicio:vHome,lanc:vTx,contas:vAcc,fixas:vRec,orc:vBud})[S.tab]();
@@ -469,7 +472,8 @@ const act={
     const due=fatDue(card,M);openTx(null,{kind:'t',amt:fatura(card,M),desc:'Fatura '+card.name+' '+MES[+M.slice(5)-1],acc:from.id,to:card.id,fat:id,date:due<today()?today():(ym(due)===S.month?due:today())})},
   newCat:()=>openCat(),editCat:id=>{const c=cfg().cats.find(x=>x.id===id);if(c)openCat(c)},
   import:()=>openImport(),exportBk:()=>exportBk(),restoreBk:()=>{const i=$('#restoreFile');i.value='';i.click()},
-  close:()=>closeSheet()
+  close:()=>closeSheet(),
+  cloud:()=>openCloud(),syncNow:()=>{sync(true)},notifOn:()=>enableNotif(),notifTest:()=>testNotif(),cloudOff:()=>cloudOff(),setApi:()=>setApi()
 };
 document.addEventListener('click',e=>{const t=e.target.closest('[data-tab]');if(t){S.tab=t.dataset.tab;render();scrollTo(0,0);return}
   const b=e.target.closest('[data-act]');if(b&&act[b.dataset.act]){e.preventDefault();act[b.dataset.act](b.dataset.id)}
@@ -478,18 +482,183 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#sheet').hidden
 document.addEventListener('input',e=>{if(e.target.id==='q'){S.q=e.target.value;const pos=e.target.selectionStart;render();const q=$('#q');if(q){q.focus();try{q.setSelectionRange(pos,pos)}catch(_){}}}});
 $('#restoreFile').addEventListener('change',e=>{const f=e.target.files[0];if(f)restoreBk(f)});
 
+
+// ================= NUVEM CIFRADA (ponta a ponta) =================
+// A senha nunca sai do aparelho. Dela derivamos (PBKDF2 600 mil rodadas + HKDF):
+//  - enc: chave AES-256-GCM que cifra cada documento e cada aviso;
+//  - mac: chave HMAC que gera nomes opacos para os documentos;
+//  - auth: senha de acesso ao servidor (o servidor guarda só o SHA-256 dela).
+const ITER=600000,te=new TextEncoder(),td=new TextDecoder();
+const b64u=b=>{b=b instanceof ArrayBuffer?new Uint8Array(b):b;let s='';for(let i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')};
+const unb64u=s=>{s=String(s).replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';const x=atob(s),o=new Uint8Array(x.length);for(let i=0;i<x.length;i++)o[i]=x.charCodeAt(i);return o};
+const API=()=>{let a='';try{a=window.FIN_API||localStorage.getItem('fin:api')||''}catch(e){}return String(a).replace(/\/+$/,'')};
+let K=null,SY={on:0,docs:{},srv:{},schedHash:'',last:0,err:'',notif:0};
+try{SY={...SY,...JSON.parse(localStorage.getItem('fin:sync')||'{}')}}catch(e){}SY.busy=0;
+const modeLine=()=>{const m=$('#mode');if(m&&S.mode==='local')m.textContent=cloudLine()};
+const saveSY=()=>{try{localStorage.setItem('fin:sync',JSON.stringify(SY))}catch(e){}};
+function idb(){return new Promise((res,rej)=>{const r=indexedDB.open('financas',1);r.onupgradeneeded=()=>r.result.createObjectStore('keys');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+async function idbOp(mode,fn){const db=await idb();return new Promise((res,rej)=>{const tx=db.transaction('keys',mode),rq=fn(tx.objectStore('keys'));tx.oncomplete=()=>res(rq&&rq.result);tx.onerror=()=>rej(tx.error)})}
+async function deriveKeys(pass,salt,iter){
+  const base=await crypto.subtle.importKey('raw',te.encode(pass.normalize('NFC')),'PBKDF2',false,['deriveBits']);
+  const bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:unb64u(salt),iterations:iter},base,256);
+  const hk=await crypto.subtle.importKey('raw',bits,'HKDF',false,['deriveBits']);
+  const sub=info=>crypto.subtle.deriveBits({name:'HKDF',hash:'SHA-256',salt:new Uint8Array(32),info:te.encode(info)},hk,256);
+  return{enc:await crypto.subtle.importKey('raw',await sub('financas/enc'),{name:'AES-GCM'},false,['encrypt','decrypt']),
+    mac:await crypto.subtle.importKey('raw',await sub('financas/id'),{name:'HMAC',hash:'SHA-256'},false,['sign']),
+    auth:b64u(new Uint8Array(await sub('financas/auth')))}}
+async function seal(obj,aad){const iv=crypto.getRandomValues(new Uint8Array(12));const c=await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:te.encode(aad)},K.enc,te.encode(JSON.stringify(obj)));return{iv:b64u(iv),c:b64u(new Uint8Array(c))}}
+async function unseal(d,aad){const p=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64u(d.iv),additionalData:te.encode(aad)},K.enc,unb64u(d.c));return JSON.parse(td.decode(p))}
+const idCache={};
+async function docId(n){if(!idCache[n])idCache[n]=b64u(new Uint8Array(await crypto.subtle.sign('HMAC',K.mac,te.encode('doc:'+n)))).slice(0,32);return idCache[n]}
+async function api(method,path,body,auth=true){
+  const r=await fetch(API()+path,{method,headers:{'Content-Type':'application/json',...(auth&&K?{Authorization:'Bearer '+K.auth}:{})},body:body?JSON.stringify(body):undefined,cache:'no-store'});
+  let j=null;try{j=await r.json()}catch(e){}
+  if(!r.ok)throw{status:r.status,code:(j&&j.error)||'http_'+r.status};return j}
+const errMsg=e=>!e?'erro':e.status===401?'A senha da nuvem mudou ou está incorreta. Desconecte e entre de novo.':e.status===429?'Muitas tentativas erradas. Aguarde 1 hora.':e.status?'Servidor respondeu com erro ('+e.code+').':'Sem conexão. Tento de novo sozinho.';
+
+function markDirty(k){if(!SY.on||!K)return;SY.docs[k]={...(SY.docs[k]||{}),u:Date.now(),dirty:1};saveSY();schedSync()}
+let syncT=0,syncing=false,again=false;
+function schedSync(ms=1500){clearTimeout(syncT);syncT=setTimeout(()=>sync(),ms)}
+function writeLocal(n,o){
+  if(n==='config'){if(o.del){S.cfg=null;localStorage.removeItem('fin:config')}else{S.cfg=o.b;localStorage.setItem('fin:config',JSON.stringify(o.b))}}
+  else{const m=n.slice(2);if(o.del||!o.b||!Array.isArray(o.b.tx)||!o.b.tx.length){delete S.months[m];localStorage.removeItem('fin:'+n)}else{S.months[m]=o.b.tx;localStorage.setItem('fin:'+n,JSON.stringify({tx:o.b.tx}))}}}
+function bodyOf(n){if(n==='config')return S.cfg?{b:S.cfg}:{del:1};const t=S.months[n.slice(2)];return t&&t.length?{b:{tx:t}}:{del:1}}
+const NAME_RE=/^(config|m-\d{4}-\d{2})$/;
+async function sync(manual){
+  if(!K||!SY.on||!API())return;if(syncing){again=true;return}
+  syncing=true;SY.busy=1;modeLine();let changed=false;
+  try{
+    const dirtyL=Object.entries(SY.docs).filter(([,m])=>m.dirty).map(([n,m])=>[n,m.u]);
+    if(dirtyL.length){const docs=[];
+      for(const[n,u]of dirtyL){const x=bodyOf(n);docs.push({id:await docId(n),u,...await seal({n,b:x.b||null,del:!!x.del},'doc')})}
+      const r=await api('POST','/api/docs',{docs});
+      for(const[n,u]of dirtyL){const id=await docId(n),s=r.docs[id];if(s&&s.u===u&&SY.docs[n]&&SY.docs[n].u===u){SY.docs[n].dirty=0;SY.srv[id]=u}}}
+    const{docs:remote}=await api('GET','/api/docs');
+    for(const id in remote){const d=remote[id];if(SY.srv[id]===d.u)continue;
+      let o;try{o=await unseal(d,'doc')}catch(e){continue}
+      if(!o||!NAME_RE.test(o.n))continue;const loc=SY.docs[o.n];
+      if(loc&&loc.dirty&&loc.u>d.u){SY.srv[id]=d.u;continue}
+      writeLocal(o.n,o);SY.docs[o.n]={u:d.u,dirty:0};SY.srv[id]=d.u;changed=true}
+    await pushSchedule();
+    SY.last=Date.now();SY.err='';if(manual)toast('Sincronizado.');
+  }catch(e){SY.err=errMsg(e);if(manual)toast(SY.err)}
+  syncing=false;SY.busy=0;saveSY();
+  if($('#sheet').hidden&&(changed||S.tab==='contas'))render();else modeLine();
+  if(again){again=false;schedSync(300)}
+}
+
+// ---- avisos agendados (gerados e cifrados aqui; o servidor só sabe a data) ----
+const addDays=(d,n)=>{const x=new Date(d+'T12:00');x.setDate(x.getDate()+n);return x.getFullYear()+'-'+pad(x.getMonth()+1)+'-'+pad(x.getDate())};
+const WHEN=n=>n===0?'vence hoje':n===1?'vence amanhã':n>1?'vence em '+n+' dias':'venceu ontem';
+function buildReminders(){const c=cfg(),t0=today(),M=curM(),by={};
+  const add=(on,pri,text)=>{if(on<t0)return;(by[on]=by[on]||[]).push({pri,text})};
+  for(const r of c.recur)if(r.kind!=='r')for(const m of[M,addMonths(M,1),addMonths(M,2)]){if(recPaid(r,m))continue;const due=mkDate(m,+r.day);
+    for(const off of[3,1,0,-1])add(addDays(due,-off),off<=0?0:1,`${r.name} ${WHEN(off)} · ${money(+r.amount)}`)}
+  for(const a of c.accounts.filter(a=>a.type==='cartao'))for(const fm of[addMonths(M,-1),M,addMonths(M,1),addMonths(M,2)]){if(fatPaid(a,fm))continue;const v=fatura(a,fm);if(!(v>0))continue;const due=fatDue(a,fm);
+    for(const off of[3,1,0,-1])add(addDays(due,-off),off<=0?0:1,`Fatura ${a.name} (${MES[+fm.slice(5)-1]}) ${WHEN(off)} · ${money(v)}`)}
+  return Object.keys(by).sort().slice(0,120).map(on=>{const it=by[on].sort((x,y)=>x.pri-y.pri),n=it.length,u=it.filter(i=>!i.pri).length;
+    return{on,title:n===1?(u?'Conta vencendo':'Lembrete de conta'):`${n} avisos de contas`+(u?` (${u} para hoje)`:''),body:it.slice(0,6).map(i=>i.text).join('\n')+(n>6?`\n…e mais ${n-6}`:'')}})}
+async function pushSchedule(){const list=buildReminders(),plain=JSON.stringify(list);
+  const h=b64u(new Uint8Array(await crypto.subtle.digest('SHA-256',te.encode(plain+'|'+K.auth))));if(h===SY.schedHash)return;
+  const items=[];for(const x of list)items.push({on:x.on,...await seal({title:x.title,body:x.body},'sched')});
+  await api('POST','/api/schedule',{items});SY.schedHash=h}
+
+// ---- ativar / entrar ----
+async function firstMerge(){const{docs:remote}=await api('GET','/api/docs'),seen=new Set();
+  for(const id in remote){const d=remote[id];let o;try{o=await unseal(d,'doc')}catch(e){continue}if(!o||!NAME_RE.test(o.n))continue;seen.add(o.n);SY.srv[id]=d.u;
+    if(o.n!=='config'&&!o.del){const loc=S.months[o.n.slice(2)]||[],ids=new Set(o.b.tx.map(t=>t.id)),extra=loc.filter(t=>!ids.has(t.id));
+      writeLocal(o.n,{b:{tx:o.b.tx.concat(extra)}});SY.docs[o.n]=extra.length?{u:Date.now(),dirty:1}:{u:d.u,dirty:0}}
+    else{writeLocal(o.n,o);SY.docs[o.n]={u:d.u,dirty:0}}}
+  if(S.cfg&&!seen.has('config'))SY.docs.config={u:Date.now(),dirty:1};
+  for(const m in S.months)if(!seen.has('m-'+m))SY.docs['m-'+m]={u:Date.now(),dirty:1}}
+async function openCloud(){
+  if(!API()){toast('O servidor ainda não está configurado.');return}
+  let meta;try{meta=await api('GET','/api/meta',null,false)}catch(e){toast('Não consegui falar com o servidor. Verifique a internet.');return}
+  const novo=!meta.configured;
+  sheet(`<form id="f" novalidate autocomplete="on"><h2>${novo?'Criar senha da nuvem':'Entrar na nuvem'}</h2>
+  <p class="hint">${novo?'Seus dados são cifrados neste iPhone com esta senha antes de ir para a nuvem. Ninguém mais consegue lê-los: nem o servidor, nem quem o invadisse.':'Digite a senha da nuvem para baixar e sincronizar seus dados.'}</p>
+  <input type="text" name="username" autocomplete="username" value="financas-app" hidden>
+  <label class="fld"><span>Senha (mínimo 10 caracteres)</span><input name="p1" type="password" autocomplete="${novo?'new-password':'current-password'}" minlength="10"></label>
+  ${novo?`<label class="fld"><span>Repita a senha</span><input name="p2" type="password" autocomplete="new-password"></label>
+  <p class="hint"><b>Não existe recuperação.</b> Se esquecer a senha, a cópia na nuvem fica inacessível (os dados deste iPhone continuam). Guarde-a nas Senhas do iPhone.</p>
+  <label class="chk"><input type="checkbox" name="ok"> Guardei a senha num lugar seguro</label>`:''}
+  <p class="hint" id="st" role="status"></p>
+  <div class="row"><button type="button" class="btn ghost" data-act="close">Cancelar</button><button class="btn" id="go">${novo?'Ativar':'Entrar'}</button></div></form>`);
+  const f=$('#f'),st=$('#st'),go=$('#go');
+  f.onsubmit=async e=>{e.preventDefault();const p1=f.p1.value;
+    if(p1.length<10){st.textContent='A senha precisa ter pelo menos 10 caracteres.';return}
+    if(novo&&p1!==f.p2.value){st.textContent='As senhas não conferem.';return}
+    if(novo&&!f.ok.checked){st.textContent='Confirme que guardou a senha.';return}
+    go.disabled=true;st.textContent='Protegendo com criptografia… alguns segundos.';
+    try{
+      const salt=novo?b64u(crypto.getRandomValues(new Uint8Array(16))):meta.salt,iter=novo?ITER:meta.iter;
+      const k=await deriveKeys(p1,salt,iter);K=k;
+      if(novo){await api('POST','/api/setup',{salt,iter,authHash:b64u(new Uint8Array(await crypto.subtle.digest('SHA-256',te.encode(k.auth))))},false);
+        SY={on:1,docs:{},srv:{},schedHash:'',last:0,err:'',notif:SY.notif||0};if(S.cfg)SY.docs.config={u:Date.now(),dirty:1};for(const m in S.months)SY.docs['m-'+m]={u:Date.now(),dirty:1}}
+      else{SY={on:1,docs:{},srv:{},schedHash:'',last:0,err:'',notif:SY.notif||0};await firstMerge()}
+      await idbOp('readwrite',s=>s.put(k,'k'));
+      saveSY();closeSheet();S.mode='local';render();await sync();toast(SY.err||'Nuvem segura ativada.');
+    }catch(e){K=null;SY.on=0;saveSY();go.disabled=false;
+      st.textContent=e&&e.status===401?'Senha incorreta.':e&&e.status===403?'A nuvem já foi configurada em outro aparelho. Feche e toque em "Entrar".':errMsg(e)}};
+}
+async function cloudOff(){if(!await ask('Desconectar este aparelho da nuvem? Os dados continuam neste iPhone e na nuvem; para voltar, use a senha.','Desconectar'))return;
+  try{const reg=await navigator.serviceWorker.getRegistration();const s=reg&&await reg.pushManager.getSubscription();if(s){try{await api('POST','/api/unsubscribe',{endpoint:s.endpoint})}catch(e){}await s.unsubscribe()}}catch(e){}
+  try{await idbOp('readwrite',s=>s.delete('k'))}catch(e){}K=null;SY={on:0,docs:{},srv:{},schedHash:'',last:0,err:'',notif:0};saveSY();render();toast('Aparelho desconectado.')}
+function setApi(){sheet(`<form id="f"><h2>Endereço do servidor</h2><label class="fld"><span>URL</span><input name="u" inputmode="url" placeholder="https://financas.xxxx.workers.dev" value="${esc(API())}"></label><div class="row"><button type="button" class="btn ghost" data-act="close">Cancelar</button><button class="btn">Salvar</button></div></form>`);
+  $('#f').onsubmit=e=>{e.preventDefault();const u=$('#f').u.value.trim();if(!/^https:\/\/[^\s/]+/.test(u)){toast('Use um endereço https://');return}try{localStorage.setItem('fin:api',u)}catch(_){}closeSheet();render()}}
+
+// ---- notificações ----
+const standalone=()=>navigator.standalone===true||matchMedia('(display-mode: standalone)').matches;
+const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent);
+async function enableNotif(){
+  if(isIOS&&!standalone()){toast('Abra o app pelo ícone da tela de início para ativar as notificações.');return}
+  if(!('Notification' in window)||!('serviceWorker' in navigator)||!('PushManager' in window)){toast('Este navegador não aceita notificações.');return}
+  let perm;try{perm=await Notification.requestPermission()}catch(e){perm='denied'}
+  if(perm!=='granted'){toast('Permissão negada. Ative em Ajustes › Notificações › Finanças.');return}
+  try{const reg=await navigator.serviceWorker.ready,{publicKey}=await api('GET','/api/vapid',null,false);
+    let s=await reg.pushManager.getSubscription();if(!s)s=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:unb64u(publicKey)});
+    await api('POST','/api/subscribe',{subscription:s.toJSON(),device:isIOS?'iPhone':'navegador'});
+    SY.notif=1;saveSY();render();toast('Notificações ativadas. Os avisos chegam às 9h.')}
+  catch(e){toast('Não consegui ativar: '+errMsg(e))}}
+async function testNotif(){try{const r=await api('POST','/api/test');toast(r.sent?'Teste enviado. Deve chegar em segundos.':'Nenhum aparelho recebeu. Desative e ative as notificações de novo.')}catch(e){toast(errMsg(e))}}
+
+// ---- telas ----
+function cloudLine(){if(!SY.on)return'Dados salvos só neste aparelho'+(S.bk?' · último backup '+S.bk.split('-').reverse().join('/'):'');
+  if(SY.busy)return'Nuvem segura · sincronizando…';if(SY.err)return'Nuvem segura · '+SY.err;
+  const pend=Object.values(SY.docs).some(m=>m.dirty);if(pend)return'Nuvem segura · alterações pendentes';
+  if(!SY.last)return'Nuvem segura';const d=new Date(SY.last);return'Nuvem segura · sincronizado '+(today()===d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())?'hoje':fmtD(d.toISOString().slice(0,10)))+' às '+pad(d.getHours())+':'+pad(d.getMinutes())}
+function vCloud(){
+  if(!API())return`<div class="sec"><div class="hdr"><h2>Nuvem segura</h2></div><p class="hint">O servidor ainda não foi configurado.</p><button class="btn ghost" data-act="setApi">Informar endereço do servidor</button></div>`;
+  if(!SY.on||!K)return`<div class="sec"><div class="hdr"><h2>Nuvem segura e notificações</h2></div><div class="card"><p style="margin:0 0 10px">Guarde uma cópia cifrada dos seus dados automaticamente e receba avisos de vencimento no iPhone. Só você, com sua senha, consegue ler.</p><button class="btn" data-act="cloud">Ativar nuvem segura</button></div></div>`;
+  const perm='Notification' in window?Notification.permission:'unsupported',on=SY.notif&&perm==='granted';
+  return`<div class="sec"><div class="hdr"><h2>Nuvem segura e notificações</h2></div><div class="card">
+  <p class="meta" style="margin:0">${esc(cloudLine())}</p><div class="act"><button class="btn ghost sm" data-act="syncNow">Sincronizar agora</button></div>
+  <p style="margin:14px 0 0">${on?'Notificações ativas. Os avisos de contas e faturas chegam às 9h: 3 dias antes, 1 dia antes, no dia e no dia seguinte se ficar em aberto.':isIOS&&!standalone()?'Para receber notificações, abra o app pelo ícone da tela de início.':'Receba avisos de contas fixas e faturas no iPhone.'}</p>
+  <div class="act">${on?'<span class="chip ok">Ativas</span><button class="btn ghost sm" data-act="notifTest">Enviar teste</button>':'<button class="btn sm" data-act="notifOn">Ativar notificações</button>'}</div>
+  <div class="act" style="margin-top:16px"><button class="btn danger sm" style="margin:0;padding:0" data-act="cloudOff">Desconectar este aparelho</button></div></div></div>`}
+
+async function cloudInit(){
+  try{K=await idbOp('readonly',s=>s.get('k'))||null}catch(e){K=null}
+  if(SY.on&&!K){SY.on=0;saveSY()}
+  render();if(!SY.on)return;
+  sync();
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')sync()});
+  addEventListener('online',()=>sync());
+  setInterval(()=>{if(document.visibilityState==='visible')sync()},60000);
+}
+
 function useLocal(){S.mode='local';
-  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k||!k.startsWith('fin:')||k==='fin:lastbk')continue;const b=JSON.parse(localStorage.getItem(k)),id=k.slice(4);if(id==='config')S.cfg=b;else if(id.startsWith('m-')&&b&&Array.isArray(b.tx))S.months[id.slice(2)]=b.tx}}catch(e){}
+  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k||!/^fin:(config|m-\d{4}-\d{2})$/.test(k))continue;const b=JSON.parse(localStorage.getItem(k)),id=k.slice(4);if(id==='config')S.cfg=b;else if(id.startsWith('m-')&&b&&Array.isArray(b.tx))S.months[id.slice(2)]=b.tx}}catch(e){}
   try{S.bk=localStorage.getItem('fin:lastbk')||''}catch(e){}
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
   store={set:async(k,b)=>{try{localStorage.setItem('fin:'+k,JSON.stringify(b))}catch(e){throw{code:e&&e.name==='QuotaExceededError'?'quota_exceeded':'erro'}}},del:async k=>{localStorage.removeItem('fin:'+k)}};
   S.loaded=true;render()}
 
-if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 render();
 (async()=>{let db=null,id=null;
   try{if(typeof claude!=='undefined'){db=await claude.use('db');const u=await claude.use('user');id=u?await u.id():null}}catch(e){}
-  if(!db||!id){useLocal();return}
+  if(!db||!id){useLocal();cloudInit();return}
   const col=db.collection('data/users/'+id);
   store={set:(k,b)=>col.doc(k).set(b),del:k=>col.doc(k).delete()};S.mode='nuvem';render();
   const tm=setTimeout(()=>{S.note=S.loaded?'Seus dados podem estar desatualizados, sem conexão no momento.':'Ainda não consegui carregar seus dados. Verifique a conexão.';render()},10000);

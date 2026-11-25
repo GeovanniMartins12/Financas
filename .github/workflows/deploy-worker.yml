@@ -1,0 +1,80 @@
+name: Publicar servidor (Cloudflare)
+
+on:
+  push:
+    branches: [main]
+    paths: ['worker/**', '.github/workflows/deploy-worker.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency: deploy-worker
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Conferir segredos
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::Cadastre CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID em Settings > Secrets and variables > Actions"
+            exit 1
+          fi
+
+      - name: Preparar armazenamento e endereço
+        run: |
+          CF="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID"
+          H=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
+          ID=$(curl -s "${H[@]}" "$CF/storage/kv/namespaces?per_page=100" | jq -r '.result[]? | select(.title=="financas-dados") | .id' | head -1)
+          if [ -z "$ID" ]; then
+            R=$(curl -s "${H[@]}" -X POST "$CF/storage/kv/namespaces" -d '{"title":"financas-dados"}')
+            ID=$(echo "$R" | jq -r '.result.id // empty')
+            [ -n "$ID" ] || { echo "::error::Não consegui criar o armazenamento KV: $(echo "$R" | jq -c '.errors')"; exit 1; }
+          fi
+          sed -i "s/__KV_ID__/$ID/" worker/wrangler.toml
+          SUB=$(curl -s "${H[@]}" "$CF/workers/subdomain" | jq -r '.result.subdomain // empty')
+          if [ -z "$SUB" ]; then
+            NEW="financas-$(echo "$CLOUDFLARE_ACCOUNT_ID" | cut -c1-6)"
+            R=$(curl -s "${H[@]}" -X PUT "$CF/workers/subdomain" -d "{\"subdomain\":\"$NEW\"}")
+            SUB=$(echo "$R" | jq -r '.result.subdomain // empty')
+            [ -n "$SUB" ] || { echo "::error::Abra o painel da Cloudflare em Workers & Pages uma vez para criar seu endereço workers.dev e rode de novo. $(echo "$R" | jq -c '.errors')"; exit 1; }
+          fi
+          echo "URL=https://financas.$SUB.workers.dev" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Publicar servidor
+        working-directory: worker
+        run: npx --yes wrangler@4 deploy
+
+      - name: Conferir servidor no ar
+        run: |
+          for i in 1 2 3 4 5 6; do
+            curl -sf "$URL/api/meta" && exit 0
+            sleep 10
+          done
+          echo "::error::O servidor não respondeu em $URL"; exit 1
+
+      - name: Gravar endereço no app
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "window.FIN_API='$URL';" > config.js
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add config.js
+          if ! git diff --cached --quiet; then
+            git commit -m "Atualiza endereço do servidor"
+            git push
+            gh api -X POST "repos/${{ github.repository }}/pages/builds" || true
+          fi
+          echo "Servidor publicado em $URL"
