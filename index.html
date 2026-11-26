@@ -181,6 +181,12 @@ code.u{display:block;background:var(--card);border-radius:10px;padding:10px;font
 .rep table{width:100%;border-collapse:collapse;font-size:14px}.rep th,.rep td{padding:8px 4px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}.rep th:first-child,.rep td:first-child{text-align:left;white-space:normal}
 .rep th{font-size:12px;color:var(--mute);font-weight:600}.rep h3{font-size:16px;margin:20px 0 6px}
 .yr{display:flex;align-items:center;gap:6px;margin:0 0 12px}.yr b{font:700 22px "Space Grotesk",Inter,sans-serif;flex:1;text-align:center}
+.cf{background:var(--card);border-radius:16px;padding:14px 16px;margin:0 0 18px}.cf .act{margin-top:8px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.chips span{font-size:13px;font-weight:600;padding:4px 10px;border-radius:20px;background:var(--card);white-space:nowrap}
+.st-ok{color:var(--pos)}.st-bad{color:var(--neg)}.st-warn{color:var(--warn)}.st-mute{color:var(--mute)}
+.rcl{list-style:none;margin:0;padding:0}.rcl li{padding:10px 0;border-bottom:1px solid var(--line)}.rcl .r1{display:flex;gap:8px;justify-content:space-between}.rcl .r1 span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rcl .r1 b{font-family:"Space Grotesk",Inter,sans-serif;white-space:nowrap}.rcl small{display:block;color:var(--mute);font-size:13px}.rcl .act{margin-top:6px}
+.opt{display:block;width:100%;text-align:left;background:var(--card);border:0;border-radius:14px;padding:14px 16px;margin:0 0 10px;cursor:pointer}.opt b{display:block;font-size:16px}.opt span{color:var(--mute);font-size:14px}
 #toast{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;z-index:30;max-width:90vw;opacity:0;pointer-events:none;transition:opacity .2s}
 #toast.on{opacity:1}
 @media(prefers-reduced-motion:reduce){#toast{transition:none}}
@@ -250,7 +256,7 @@ const PAL=['#2f9e6b','#3b7dd8','#d9822b','#c2417a','#7a5af5','#1aa3a3','#b39a1f'
 const DEF_CATS=[['moradia','Moradia','d'],['mercado','Mercado','d'],['comer','Alimentação fora','d'],['transp','Transporte','d'],['saude','Saúde','d'],['educ','Educação','d'],['lazer','Lazer','d'],['assin','Assinaturas','d'],['compras','Compras','d'],['casa','Contas da casa','d'],['outros','Outros','d'],['salario','Salário','r'],['extra','Renda extra','r'],['rend','Rendimentos','r'],['outrosr','Outras receitas','r']].map(([id,name,kind],i)=>({id,name,kind,color:PAL[i%PAL.length]}));
 const KW=[[/ifood|restaur|lanch|padaria|bar |pizz|burger|cafe/,'comer'],[/uber|99 ?pop|99app|posto|combust|shell|ipiranga|estacion|pedagio|metro|onibus/,'transp'],[/mercado|supermerc|atacad|carrefour|assai|extra hiper|pao de acucar|hortifrut/,'mercado'],[/farmac|drogaria|droga|raia|hospital|clinica|laborat|unimed/,'saude'],[/netflix|spotify|prime video|amazon prime|disney|youtube|hbo|max |apple\.com|icloud|google one|deezer|globoplay/,'assin'],[/aluguel|condominio|iptu/,'moradia'],[/energia|enel|cemig|copel|light|sabesp|agua|gas |internet|vivo|claro|tim |oi /,'casa'],[/escola|faculdade|curso|udemy|livraria/,'educ'],[/cinema|ingresso|show|steam|playstation|xbox/,'lazer'],[/salario|salário|folha|pagto sal/,'salario'],[/rendimento|juros|dividend|rend pago/,'rend']];
 
-const S={f:{all:false,cat:'',acc:'',min:'',max:'',open:false},cfg:null,dels:{},months:{},month:ym(today()),tab:'inicio',q:'',mode:'',loaded:false,note:''};
+const S={f:{all:false,cat:'',acc:'',min:'',max:'',open:false},cfg:null,dels:{},rc:{},months:{},month:ym(today()),tab:'inicio',q:'',mode:'',loaded:false,note:''};
 let store=null;const saving={},dirty={};
 
 const cfg=()=>S.cfg||{accounts:[],cats:DEF_CATS,budgets:{},recur:[],rules:{}};
@@ -267,7 +273,7 @@ async function save(k){
   saving[k]=1;
   try{do{dirty[k]=0;
     if(k==='config')await store.set(k,JSON.parse(JSON.stringify(S.cfg)));
-    else{const m=k.slice(2),tx=S.months[m]||[],dl=S.dels[m]||[];if(tx.length||dl.length)await store.set(k,{tx:JSON.parse(JSON.stringify(tx)),del:dl.slice(-1000)});else{delete S.months[m];await store.del(k)}if(!tx.length)delete S.months[m]}
+    else{const m=k.slice(2),tx=S.months[m]||[],dl=S.dels[m]||[],rc=S.rc[m]||[];if(tx.length||dl.length||rc.length)await store.set(k,{tx:JSON.parse(JSON.stringify(tx)),del:dl.slice(-1000),rc:JSON.parse(JSON.stringify(rc))});else{delete S.months[m];await store.del(k)}if(!tx.length)delete S.months[m]}
   }while(dirty[k]);markDirty(k)}
   catch(e){toast(e&&e.code==='quota_exceeded'?'Espaço cheio. Exporte um backup e apague meses antigos.':'Não consegui salvar ('+((e&&e.code)||'erro')+'). Tente de novo.')}
   saving[k]=0;
@@ -316,6 +322,7 @@ function vHome(){const m=S.month,{r,d}=totals(m),left=r2(r-d),c=cfg();
   return `<section class="hero"><span class="lbl">${left<0?'Faltou':'Sobrou'} em ${MESF[+m.slice(5)-1].toLowerCase()}</span><p class="big num${left<0?' neg':''}">${money(left)}</p>
   <div class="pair"><div><span class="lbl">Receitas</span><b>${money(r)}</b></div><div><span class="lbl">Despesas</span><b>${money(d)}</b></div><div><span class="lbl">Saldo em contas</span><b>${money(tot)}</b></div></div></section>
   ${vQuick()}
+  ${vConfCard()}
   ${m===curM()?vForecast():''}
   ${m===curM()?vPlan():''}
   ${!c.accounts.length?`<div class="callout"><span>Comece cadastrando uma conta ou cartão.</span><button class="btn" data-act="newAcc">Criar conta</button></div>`:''}
@@ -337,7 +344,7 @@ function vTx(){const m=S.month,q=norm2(S.q).trim(),F=S.f,c=cfg();
   const sr=r2(list.filter(t=>t.kind==='r').reduce((s,t)=>s+t.amt,0)),sd=r2(list.filter(t=>t.kind==='d').reduce((s,t)=>s+t.amt,0));
   const shown=list.slice(0,300),g={};shown.forEach(t=>(g[t.date]=g[t.date]||[]).push(t));
   const{r,d}=totals(m);
-  return `<div class="toolbar"><input id="q" type="search" placeholder="${F.all?'Buscar em todos os meses':'Buscar neste mês'}" value="${esc(S.q)}" aria-label="Buscar lançamentos"><button class="btn ghost" data-act="fOpen" aria-expanded="${F.open?'true':'false'}">Filtros${nf?' ('+nf+')':''}</button><button class="btn ghost" data-act="import">Importar extrato</button></div>
+  return `<div class="toolbar"><input id="q" type="search" placeholder="${F.all?'Buscar em todos os meses':'Buscar neste mês'}" value="${esc(S.q)}" aria-label="Buscar lançamentos"><button class="btn ghost" data-act="fOpen" aria-expanded="${F.open?'true':'false'}">Filtros${nf?' ('+nf+')':''}</button><button class="btn ghost" data-act="importMenu">Importar</button></div>
   ${F.open?`<div class="filt"><div class="seg s2"><label><input type="radio" name="fAll" value="0" ${F.all?'':'checked'}><span>Este mês</span></label><label><input type="radio" name="fAll" value="1" ${F.all?'checked':''}><span>Todos os meses</span></label></div>
   <div class="two"><label class="fld"><span>Categoria</span><select id="fCat"><option value="">Todas</option>${c.cats.map(x=>`<option value="${esc(x.id)}" ${x.id===F.cat?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>
   <label class="fld"><span>Conta</span><select id="fAcc"><option value="">Todas</option>${accOpts(F.acc)}</select></label></div>
@@ -414,7 +421,7 @@ function openTx(t,pre,note){const c=cfg();if(!c.accounts.length){toast('Cadastre
     if(!f.date.value){toast('Informe a data.');return}
     const k=f.kind.value,nt={id:x.id,kind:k,amt:r2(amt),desc:f.desc.value.trim(),date:f.date.value,acc:f.acc.value};
     if(k==='t'){if(f.to.value===nt.acc||!f.to.value){toast('Escolha duas contas diferentes.');return}nt.to=f.to.value}else nt.cat=f.cat.value;
-    for(const p of['rid','fat','fitid','inst','auto','grp'])if(x[p])nt[p]=x[p];
+    for(const p of['rid','fat','fitid','inst','auto','grp','rcid','ps'])if(x[p])nt[p]=x[p];
     const pp=q('parc'),n=isNew&&pp&&!pp.hidden?Math.max(1,Math.min(48,parseInt(f.parc.value)||1)):1;
     if(isNew&&k==='d'&&f.qk&&f.qk.checked){const cc=ensureCfg();cc.quick=cc.quick||[];if(cc.quick.length<12){cc.quick.push({id:uid(),label:(nt.desc||catOf(nt.cat).name).slice(0,24),amt:n>1?0:nt.amt,cat:nt.cat,acc:nt.acc});save('config')}}
     if(n>1){const each=Math.floor(nt.amt/n*100)/100,first=r2(nt.amt-each*(n-1)),day=+nt.date.slice(8),base=nt.desc||catOf(nt.cat).name,grp=uid();
@@ -514,8 +521,14 @@ function openImport(){const c=cfg();if(!c.accounts.length){toast('Cadastre uma c
   f.file.onchange=async()=>{const file=f.file.files[0];if(!file)return;try{text=await readText(file)}catch(e){toast('Não consegui ler o arquivo.');return}ofx=/OFXHEADER|<OFX>/i.test(text);setInv();build()};
   f.acc.onchange=()=>{setInv();build()};f.inv.onchange=build;
   f.onsubmit=e=>{e.preventDefault();const acc=f.acc.value,nw=rows.filter(r=>!r.dup),touched=new Set();if(!nw.length)return;
-    for(const r of nw){const t={id:uid(),kind:r.kind,amt:r.amt,desc:r.desc,date:r.date,acc,cat:r.cat,m:Date.now()};if(r.fitid)t.fitid=r.fitid;const k=ym(t.date);(S.months[k]=S.months[k]||[]).push(t);touched.add(k)}
-    touched.forEach(k=>save('m-'+k));const last=[...touched].sort().pop();if(last)S.month=last;closeSheet();S.tab='lanc';render();toast(nw.length+' lançamentos importados. Toque em um para mudar a categoria.')};
+    let linked=0;const pool=allTx().filter(t=>t.rcid&&!t.fitid&&t.kind==='d');
+    for(const r of nw){
+      // corrida lançada pelo recibo: só completa com os dados do extrato, sem duplicar
+      const lo=addDaysIso(r.date,-5),pre=r.kind==='d'?pool.find(t=>!t._u&&Math.abs(t.amt-r.amt)<=.05&&t.date>=lo&&t.date<=addDaysIso(r.date,1)):null;
+      if(pre){pre._u=1;pre.fitid=r.fitid||('x'+r.date+r.amt);pre.acc=acc;pre.m=Date.now();touched.add(ym(pre.date));linked++;continue}
+      const t={id:uid(),kind:r.kind,amt:r.amt,desc:r.desc,date:r.date,acc,cat:r.cat,m:Date.now()};if(r.fitid)t.fitid=r.fitid;const k=ym(t.date);(S.months[k]=S.months[k]||[]).push(t);touched.add(k)}
+    pool.forEach(t=>delete t._u);
+    touched.forEach(k=>save('m-'+k));const rcN=allRc().length?reconcile():0;const last=[...touched].sort().pop();if(last)S.month=last;closeSheet();S.tab='lanc';render();toast((nw.length-linked)+' lançamento'+(nw.length-linked===1?'':'s')+' importado'+(nw.length-linked===1?'':'s')+(linked?` · ${linked} corrida${linked>1?'s':''} conciliada${linked>1?'s':''} com recibos`:'')+(allRc().length?'. Veja a conferência no Início.':'. Toque em um para mudar a categoria.'))};
 }
 
 function markBk(){S.bk=today();try{localStorage.setItem('fin:lastbk',S.bk)}catch(e){}render()}
@@ -524,7 +537,7 @@ async function saveFile(name,blob,okMsg){
     if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});return true}
     const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);toast(okMsg||'Arquivo baixado.');return true}
   catch(e){if(e&&e.name==='AbortError')return true;return false}}
-async function exportBk(){const data=JSON.stringify({app:'controle-financeiro',version:1,exported:new Date().toISOString(),cfg:cfg(),months:S.months});
+async function exportBk(){const data=JSON.stringify({app:'controle-financeiro',version:1,exported:new Date().toISOString(),cfg:cfg(),months:S.months,rc:S.rc});
   const name='financas-backup-'+today()+'.json';let dl=null;try{dl=typeof claude!=='undefined'?await claude.use('downloads'):null}catch(e){}
   if(dl){try{await dl.save({filename:name,data});markBk();toast('Backup salvo.');return}catch(e){}}
   try{const file=new File([data],name,{type:'application/json'});
@@ -535,8 +548,8 @@ async function exportBk(){const data=JSON.stringify({app:'controle-financeiro',v
 async function restoreBk(file){let b;try{b=JSON.parse(await readText(file))}catch(e){toast('Arquivo inválido.');return}
   if(!b||b.app!=='controle-financeiro'||!b.cfg||typeof b.months!=='object'){toast('Esse arquivo não é um backup deste app.');return}
   if(!await ask('Restaurar o backup de '+String(b.exported||'').slice(0,10).split('-').reverse().join('/')+'? Os dados atuais serão substituídos.','Restaurar'))return;
-  const old=Object.keys(S.months);S.cfg=b.cfg;S.months={};for(const k in b.months)if(/^\d{4}-\d{2}$/.test(k)&&Array.isArray(b.months[k]))S.months[k]=b.months[k];
-  ensureCfg();save('config');new Set([...old,...Object.keys(S.months)]).forEach(k=>save('m-'+k));render();toast('Backup restaurado.')}
+  const old=[...new Set([...Object.keys(S.months),...Object.keys(S.rc)])];S.rc={};if(b.rc&&typeof b.rc==='object')for(const k in b.rc)if(/^\d{4}-\d{2}$/.test(k)&&Array.isArray(b.rc[k]))S.rc[k]=b.rc[k];S.cfg=b.cfg;S.months={};for(const k in b.months)if(/^\d{4}-\d{2}$/.test(k)&&Array.isArray(b.months[k]))S.months[k]=b.months[k];
+  ensureCfg();save('config');new Set([...old,...Object.keys(S.months),...Object.keys(S.rc)]).forEach(k=>save('m-'+k));render();toast('Backup restaurado.')}
 
 const act={
   prevM:()=>{S.month=addMonths(S.month,-1);render()},nextM:()=>{S.month=addMonths(S.month,1);render()},
@@ -552,7 +565,7 @@ const act={
   cloud:()=>openCloud(),lockOn:()=>enableLock(),lockOff:()=>disableLock(),apHelp:()=>openApHelp(),apTest:()=>{const c=cfg(),a=c.accounts.find(a=>a.type==='cartao')||c.accounts[0];handleAp('12,34|Padaria Teste|'+(a?a.name:''))},
   fcToggle:()=>{S.fcOpen=!S.fcOpen;render()},
   fOpen:()=>{S.f.open=!S.f.open;render()},fClear:()=>{S.f={all:false,cat:'',acc:'',min:'',max:'',open:true};S.q='';render()},
-  quick:id=>runQuick(id),report:()=>openReport(+S.month.slice(0,4)),newGoal:()=>openGoal(),editGoal:id=>openGoal(id),goalIn:id=>openGoalMove(id,1),goalOut:id=>openGoalMove(id,-1),quickEdit:()=>openQuick(),planRow:k=>{S.planOpen=S.planOpen===k?'':k;render()},syncNow:()=>{sync(true)},notifOn:()=>enableNotif(),notifTest:()=>testNotif(),cloudOff:()=>cloudOff(),setApi:()=>setApi()
+  quick:id=>runQuick(id),importMenu:()=>openImportMenu(),imp99:()=>openReceipts(),impPay:()=>openPayslipImport(),conf:()=>openConf(),pays:()=>openPayslips(),report:()=>openReport(+S.month.slice(0,4)),newGoal:()=>openGoal(),editGoal:id=>openGoal(id),goalIn:id=>openGoalMove(id,1),goalOut:id=>openGoalMove(id,-1),quickEdit:()=>openQuick(),planRow:k=>{S.planOpen=S.planOpen===k?'':k;render()},syncNow:()=>{sync(true)},notifOn:()=>enableNotif(),notifTest:()=>testNotif(),cloudOff:()=>cloudOff(),setApi:()=>setApi()
 };
 document.addEventListener('click',e=>{const t=e.target.closest('[data-tab]');if(t){S.tab=t.dataset.tab;render();scrollTo(0,0);return}
   const b=e.target.closest('[data-act]');if(b&&act[b.dataset.act]){e.preventDefault();act[b.dataset.act](b.dataset.id)}
@@ -605,14 +618,15 @@ let syncT=0,syncing=false,again=false;
 function schedSync(ms=1500){clearTimeout(syncT);syncT=setTimeout(()=>sync(),ms)}
 function writeLocal(n,o){
   if(n==='config'){if(o.del){S.cfg=null;localStorage.removeItem('fin:config')}else{S.cfg=o.b;localStorage.setItem('fin:config',JSON.stringify(o.b))}}
-  else{const m=n.slice(2),tx=o.b&&Array.isArray(o.b.tx)?o.b.tx:[],dl=o.b&&Array.isArray(o.b.del)?o.b.del:[];
-    if(o.del||(!tx.length&&!dl.length)){delete S.months[m];delete S.dels[m];localStorage.removeItem('fin:'+n)}
-    else{if(tx.length)S.months[m]=tx;else delete S.months[m];S.dels[m]=dl;localStorage.setItem('fin:'+n,JSON.stringify({tx,del:dl}))}}}
-function bodyOf(n){if(n==='config')return S.cfg?{b:S.cfg}:{del:1};const m=n.slice(2),t=S.months[m]||[],dl=S.dels[m]||[];return t.length||dl.length?{b:{tx:t,del:dl.slice(-1000)}}:{del:1}}
+  else{const m=n.slice(2),tx=o.b&&Array.isArray(o.b.tx)?o.b.tx:[],dl=o.b&&Array.isArray(o.b.del)?o.b.del:[],rc=o.b&&Array.isArray(o.b.rc)?o.b.rc:[];
+    if(o.del||(!tx.length&&!dl.length&&!rc.length)){delete S.months[m];delete S.dels[m];delete S.rc[m];localStorage.removeItem('fin:'+n)}
+    else{if(tx.length)S.months[m]=tx;else delete S.months[m];S.dels[m]=dl;if(rc.length)S.rc[m]=rc;else delete S.rc[m];localStorage.setItem('fin:'+n,JSON.stringify({tx,del:dl,rc}))}}}
+function bodyOf(n){if(n==='config')return S.cfg?{b:S.cfg}:{del:1};const m=n.slice(2),t=S.months[m]||[],dl=S.dels[m]||[],rc=S.rc[m]||[];return t.length||dl.length||rc.length?{b:{tx:t,del:dl.slice(-1000),rc}}:{del:1}}
 // junta duas versões do mesmo mês: une os lançamentos, fica com a edição mais recente e respeita exclusões
 function mergeMonth(a,b){const del=[...new Set([...(a.del||[]),...(b.del||[])])],gone=new Set(del),by=new Map();
   for(const t of[...(b.tx||[]),...(a.tx||[])]){if(gone.has(t.id))continue;const cur=by.get(t.id);if(!cur||(t.m||0)>=(cur.m||0))by.set(t.id,t)}
-  return{tx:[...by.values()],del:del.slice(-1000)}}
+  const rb=new Map();for(const r of[...(b.rc||[]),...(a.rc||[])]){const cur=rb.get(r.id);if(!cur||(r.m||0)>=(cur.m||0))rb.set(r.id,r)}
+  return{tx:[...by.values()],del:del.slice(-1000),rc:[...rb.values()]}}
 const NAME_RE=/^(config|m-\d{4}-\d{2})$/;
 async function sync(manual){
   if(!K||!SY.on||!API())return;if(syncing){again=true;return}
@@ -628,7 +642,7 @@ async function sync(manual){
       let o;try{o=await unseal(d,'doc')}catch(e){continue}
       if(!o||!NAME_RE.test(o.n))continue;const loc=SY.docs[o.n];
       if(loc&&loc.dirty){SY.srv[id]=d.u;
-        if(o.n!=='config'&&!o.del){const m=o.n.slice(2);writeLocal(o.n,{b:mergeMonth({tx:S.months[m]||[],del:S.dels[m]||[]},o.b)});SY.docs[o.n]={u:Math.max(Date.now(),d.u+1),dirty:1};again=true;changed=true;continue}
+        if(o.n!=='config'&&!o.del){const m=o.n.slice(2);writeLocal(o.n,{b:mergeMonth({tx:S.months[m]||[],del:S.dels[m]||[],rc:S.rc[m]||[]},o.b)});SY.docs[o.n]={u:Math.max(Date.now(),d.u+1),dirty:1};again=true;changed=true;continue}
         if(loc.u>d.u)continue}
       writeLocal(o.n,o);SY.docs[o.n]={u:d.u,dirty:0};SY.srv[id]=d.u;changed=true}
     await pushSchedule();
@@ -661,7 +675,8 @@ async function pushSchedule(){const list=buildReminders(),plain=JSON.stringify(l
 async function firstMerge(){const{docs:remote}=await api('GET','/api/docs'),seen=new Set();
   for(const id in remote){const d=remote[id];let o;try{o=await unseal(d,'doc')}catch(e){continue}if(!o||!NAME_RE.test(o.n))continue;seen.add(o.n);SY.srv[id]=d.u;
     if(o.n!=='config'&&!o.del){const m=o.n.slice(2),loc=S.months[m]||[],ids=new Set((o.b.tx||[]).map(t=>t.id)),extra=loc.filter(t=>!ids.has(t.id));
-      writeLocal(o.n,{b:mergeMonth({tx:loc,del:S.dels[m]||[]},o.b)});SY.docs[o.n]=extra.length?{u:Date.now(),dirty:1}:{u:d.u,dirty:0}}
+      const rids=new Set((o.b.rc||[]).map(r=>r.id)),xr=(S.rc[m]||[]).filter(r=>!rids.has(r.id));
+      writeLocal(o.n,{b:mergeMonth({tx:loc,del:S.dels[m]||[],rc:S.rc[m]||[]},o.b)});SY.docs[o.n]=extra.length||xr.length?{u:Date.now(),dirty:1}:{u:d.u,dirty:0}}
     else{writeLocal(o.n,o);SY.docs[o.n]={u:d.u,dirty:0}}}
   if(S.cfg&&!seen.has('config'))SY.docs.config={u:Date.now(),dirty:1};
   for(const m in S.months)if(!seen.has('m-'+m))SY.docs['m-'+m]={u:Date.now(),dirty:1}}
@@ -742,6 +757,244 @@ async function cloudInit(){
   addEventListener('online',()=>sync());
   setInterval(()=>{if(document.visibilityState==='visible')sync()},60000);
 }
+
+// ================= LEITURA DE PDF (no próprio aparelho) =================
+let pdfP=null;
+function loadPDFJS(){if(window.pdfjsLib)return Promise.resolve(window.pdfjsLib);
+  if(!pdfP)pdfP=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload=()=>{const L=window.pdfjsLib;if(!L)return rej(new Error('pdfjs'));L.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';res(L)};
+    s.onerror=()=>{pdfP=null;rej(new Error('offline'))};document.head.appendChild(s)});return pdfP}
+async function pdfItems(file){const L=await loadPDFJS(),doc=await L.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false}).promise,out=[];
+  for(let p=1;p<=doc.numPages;p++){const pg=await doc.getPage(p),vp=pg.getViewport({scale:1}),tc=await pg.getTextContent();
+    for(const it of tc.items){if(!it.str||!it.str.trim())continue;const t=it.transform;if(Math.abs(t[1])>.01||Math.abs(t[2])>.01)continue;
+      out.push({s:it.str,x:t[4],y:vp.height-t[5]-(it.height||Math.abs(t[3])||8),w:it.width,p:p-1})}}
+  try{doc.destroy()}catch(e){}return out}
+// Leitores de PDF (recibo da 99 e holerite). Recebem itens de texto com posição:
+// [{s:'texto', x, y (de cima para baixo), w (largura, opcional), p (página)}]
+const MONEY_RE=/^-?(?:R\$\s?)?-?\d{1,3}(?:\.\d{3})*,\d{2}$/;
+const toNum=s=>{const neg=/-/.test(s);const v=parseFloat(String(s).replace(/[^\d,]/g,'').replace(',','.'));return neg?-v:v};
+const nrm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+// quebra cada item em palavras, estimando a posição de cada uma
+function tokens(items){const out=[];
+  for(const it of items){const s=String(it.s||'').replace(/\s+/g,' ').trim();if(!s)continue;
+    const w=it.w>0?it.w:s.length*5.4,cw=w/Math.max(1,s.length);let pos=0;
+    for(const part of s.split(' ')){const i=s.indexOf(part,pos);out.push({s:part,x:it.x+i*cw,w:part.length*cw,y:it.y,p:it.p||0});pos=i+part.length}}
+  return out}
+function lines(items,tol=2.6){const tk=tokens(items).sort((a,b)=>a.p-b.p||a.y-b.y||a.x-b.x),ls=[];
+  for(const t of tk){let l=ls.length?ls[ls.length-1]:null;if(!l||l.p!==t.p||Math.abs(t.y-l.y)>tol){l={p:t.p,y:t.y,t:[]};ls.push(l)}l.t.push(t)}
+  for(const l of ls){l.t.sort((a,b)=>a.x-b.x);l.text=l.t.map(t=>t.s).join(' ')}
+  return ls}
+
+// ---------- 99 ----------
+const MES3={jan:1,fev:2,mar:3,abr:4,mai:5,jun:6,jul:7,ago:8,set:9,out:10,nov:11,dez:12};
+const DATE99=/(?:dom|seg|ter|qua|qui|sex|s[aá]b)[a-z.]*,?\s*(\d{1,2})\s+(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-z.]*,?\s*(\d{4})/i;
+function parse99(items){const ls=lines(items).map(l=>l.text),recs=[];
+  // um PDF pode ter vários recibos: cada um começa numa linha com a data
+  const starts=[];ls.forEach((t,i)=>{if(DATE99.test(t))starts.push(i)});
+  starts.forEach((st,k)=>{const seg=ls.slice(st,k+1<starts.length?starts[k+1]:ls.length),txt=seg.join('\n');
+    const dm=seg[0].match(DATE99),date=`${dm[3]}-${String(MES3[nrm(dm[2]).slice(0,3)]).padStart(2,'0')}-${dm[1].padStart(2,'0')}`;
+    const money=l=>{const m=l.match(/-?R\$\s?-?[\d.]+,\d{2}/);return m?Math.abs(toNum(m[0])):null};
+    let total=null;for(const l of seg)if(/^total\b/i.test(l.trim())&&money(l)!=null){total=money(l);break}
+    if(total==null){const tl=seg.find(l=>/valor da corrida/i.test(l));if(tl)total=money(tl)}
+    if(total==null)return;
+    let pay='',pi=seg.findIndex(l=>/m[eé]todo de pagamento/i.test(l));
+    if(pi>=0&&seg[pi+1])pay=seg[pi+1].replace(/-?R\$\s?-?[\d.]+,\d{2}/,'').trim();
+    const km=txt.match(/([\d.,]+)\s*km\s*\|\s*(\d+)\s*min/i);
+    let cat='';const cm=txt.match(/escolher o\s+(.+)/i);if(cm)cat=cm[1].trim();
+    const times=[];seg.forEach((l,i)=>{const m=l.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);if(m){let h=+m[1];if(m[3]){const pm=/pm/i.test(m[3]);if(pm&&h<12)h+=12;if(!pm&&h===12)h=0}times.push({t:String(h).padStart(2,'0')+':'+m[2],addr:(seg[i+1]||'').trim()})}});
+    const pay2=nrm(pay),payType=/dinheiro|especie/.test(pay2)?'cash':/pix/.test(pay2)?'pix':/99pay|saldo|carteira/.test(pay2)?'wallet':'card';
+    recs.push({src:'99',date,time:times[0]?times[0].t:'',end:times[1]?times[1].t:'',amt:total,pay,payType,km:km?toNum(km[1]+(km[1].includes(',')?'':',0')):null,min:km?+km[2]:null,cat,from:times[0]?times[0].addr:'',to:times[1]?times[1].addr:''})});
+  return recs}
+
+// ---------- holerite ----------
+const MESES=['janeiro','fevereiro','marco','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const DESC_HINT=/inss|irrf|i\.r|imposto|vale|v\.t|desc|emp|emprest|consig|adiant|falta|atraso|contrib|sindic|pens|plano|saude|odont|seguro|coparti|refei|alimenta|farm|cred\.? ?trab/;
+function parseHolerite(items){const ls=lines(items);if(!ls.length)return null;
+  const all=ls.map(l=>l.text).join('\n'),n=nrm(all);
+  const cm=n.match(/(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s*(?:de|\/)?\s*(\d{4})/);
+  const comp=cm?`${cm[2]}-${String(MESES.indexOf(cm[1])+1).padStart(2,'0')}`:'';
+  const emp=(ls[0].text.split(/cnpj/i)[0]||'').trim().slice(0,60);
+  // cabeçalho da tabela
+  const hi=ls.findIndex(l=>/vencimentos/i.test(l.text)&&/descontos/i.test(l.text)&&!/total/i.test(l.text));
+  const col=(l,re)=>{const t=l.t.find(t=>re.test(nrm(t.s)));return t?t.x+t.w/2:null};
+  let cRef=null,cVen=null,cDes=null;if(hi>=0){cRef=col(ls[hi],/^refer/);cVen=col(ls[hi],/^vencim/);cDes=col(ls[hi],/^descont/)}
+  const okCols=cVen!=null&&cDes!=null&&cDes>cVen+20;
+  const ti=ls.findIndex((l,i)=>i>hi&&/total de vencimentos/i.test(l.text));
+  const end=ti>0?ti:ls.length;
+  const rows=[],seen=new Set();
+  const st=hi>=0?hi+1:Math.max(0,ls.findIndex(l=>l.t.length&&/^\d{1,5}$/.test(l.t[0].s)&&l.t.some(x=>MONEY_RE.test(x.s))));
+  for(let i=st;i<end;i++){const l=ls[i],t=l.t;if(!t.length||!/^\d{1,5}$/.test(t[0].s))continue;
+    const nums=t.filter(x=>MONEY_RE.test(x.s)),words=t.slice(1).filter(x=>!MONEY_RE.test(x.s));
+    // números da linha de baixo/de cima que ficaram desalinhados (ex.: referência um pouco deslocada)
+    if(!nums.length)continue;
+    const desc=words.map(x=>x.s).join(' ').trim();if(!desc)continue;
+    let ref=null,v=null,kind=null;
+    if(okCols){for(const x of nums){const c=x.x+x.w/2,d=[[Math.abs(c-(cRef??-999)),'r'],[Math.abs(c-cVen),'v'],[Math.abs(c-cDes),'d']].sort((a,b)=>a[0]-b[0])[0][1];
+        if(d==='r')ref=toNum(x.s);else{v=toNum(x.s);kind=d}}}
+    if(v==null){const last=nums[nums.length-1];v=toNum(last.s);if(nums.length>1)ref=toNum(nums[0].s);kind=DESC_HINT.test(nrm(desc).replace(/\./g,''))?'d':'v'}
+    const key=t[0].s+'|'+v;if(seen.has(key))continue;seen.add(key);
+    rows.push({c:t[0].s,d:desc,ref,v:Math.abs(v),t:kind})}
+  // referência que caiu em outra linha (sem código): encaixa na linha anterior sem referência
+  const sumV=rows.filter(r=>r.t==='v').reduce((s,r)=>s+r.v,0),sumD=rows.filter(r=>r.t==='d').reduce((s,r)=>s+r.v,0);
+  const nearBelow=(re,maxDy=30)=>{for(let i=0;i<ls.length;i++){const lab=ls[i].t.find((_,j,a)=>re.test(nrm(a.slice(j,j+4).map(x=>x.s).join(' '))));if(!lab)continue;
+      const cx=lab.x+lab.w/2;let best=null;
+      for(let k=i;k<ls.length&&ls[k].y-ls[i].y<=maxDy;k++)for(const x of ls[k].t)if(MONEY_RE.test(x.s)&&!(k===i&&x.x<lab.x-120)){const d=Math.abs(x.x+x.w/2-cx)+(ls[k].y-ls[i].y);if(!best||d<best.d)best={d,v:toNum(x.s)}}
+      if(best)return best.v}return null};
+  const totV=nearBelow(/^total de vencimentos/),totD=nearBelow(/^total de descontos/);
+  let liq=null;for(const l of ls)if(/l[ií]quido/i.test(l.text)){const m=l.t.filter(x=>MONEY_RE.test(x.s));if(m.length){liq=toNum(m[m.length-1].s);break}}
+  const fgts=nearBelow(/^f\.?g\.?t\.?s\.?\s*(do\s*)?m/),base=nearBelow(/^salario base/),irrf=nearBelow(/^base calc\.? irrf/);
+  const r2=v=>Math.round(v*100)/100,bruto=r2(totV??sumV),desc=r2(totD??sumD),liquido=r2(liq??(bruto-desc));
+  const check=Math.abs(sumV-bruto)<.02&&Math.abs(sumD-desc)<.02&&Math.abs(bruto-desc-liquido)<.02;
+  return{comp,emp,bruto,desc,liquido,fgts,base,baseIR:irrf,rows,check}}
+
+
+// ================= IMPORTAR (menu) =================
+function openImportMenu(){sheet(`<h2>Importar</h2>
+  <button class="opt" data-act="import"><b>Extrato do banco ou do cartão</b><span>Arquivo OFX ou CSV. Concilia com os recibos já importados.</span></button>
+  <button class="opt" data-act="imp99"><b>Recibos da 99</b><span>PDFs dos recibos (pode escolher vários de uma vez).</span></button>
+  <button class="opt" data-act="impPay"><b>Holerite</b><span>PDF do contracheque da empresa.</span></button>
+  <p class="hint">Os PDFs são lidos aqui no iPhone. Só os valores extraídos são salvos, cifrados como o resto.</p>
+  <div class="row"><button class="btn ghost" data-act="close">Fechar</button></div>`)}
+
+// ================= RECIBOS 99 / UBER + CONCILIAÇÃO =================
+const RC_RE={'99':/(^|[^0-9])99(\s|\*|app|pop|tecnolog|taxi|comfort|$)|noventa e nove/i,uber:/uber/i};
+const allRc=()=>Object.values(S.rc).flat();
+const rcLabel=r=>(r.src==='99'?'99 ':'Uber ')+(r.cat||'');
+const addDaysIso=(d,n)=>{const x=new Date(d+'T12:00');x.setDate(x.getDate()+n);return x.getFullYear()+'-'+pad(x.getMonth()+1)+'-'+pad(x.getDate())};
+function findTxById(id){for(const k in S.months){const t=S.months[k].find(x=>x.id===id);if(t)return[t,k]}return[null,null]}
+function reconcile(){const touched=new Set(),used=new Set();
+  for(const t of allTx())if(t.rcid)used.add(t.id);
+  // limpa vínculos quebrados
+  for(const m in S.rc)for(const r of S.rc[m]){if(r.tx){const[t]=findTxById(r.tx);if(!t||t.rcid!==r.id){delete r.tx;r.m=Date.now();touched.add(m)}}}
+  const txs=allTx().filter(t=>t.kind==='d');
+  for(const m in S.rc)for(const r of S.rc[m]){if(r.tx)continue;delete r.diff;
+    if(r.payType!=='card')continue;
+    const lo=addDaysIso(r.date,-1),hi=addDaysIso(r.date,5),kw=RC_RE[r.src];
+    const cand=txs.filter(t=>!used.has(t.id)&&!t.rcid&&t.date>=lo&&t.date<=hi);
+    const exact=cand.filter(t=>Math.abs(t.amt-r.amt)<=.05&&kw.test(norm2(t.desc))).sort((a,b)=>Math.abs(days2(a.date,r.date))-Math.abs(days2(b.date,r.date)))[0];
+    if(exact){r.tx=exact.id;exact.rcid=r.id;used.add(exact.id);r.m=Date.now();touched.add(m);touched.add(ym(exact.date));continue}
+    const near=cand.filter(t=>kw.test(norm2(t.desc))&&Math.abs(t.amt-r.amt)/r.amt<=.4).sort((a,b)=>Math.abs(a.amt-r.amt)-Math.abs(b.amt-r.amt))[0];
+    if(near){r.diff=near.id;touched.add(m)}}
+  touched.forEach(k=>save('m-'+k));return touched.size}
+const days2=(a,b)=>Math.round((new Date(a+'T12:00')-new Date(b+'T12:00'))/864e5);
+function confData(scope){const inS=d=>scope==='all'||ym(d)===scope,rcs=allRc().filter(r=>inS(r.date)).sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time));
+  const ok=[],diff=[],pend=[],cash=[];
+  for(const r of rcs){if(r.tx){const[t]=findTxById(r.tx);if(t&&Math.abs(t.amt-r.amt)>.05)diff.push({r,t});else ok.push({r,t})}
+    else if(r.payType!=='card')cash.push({r});else if(r.diff){const[t]=findTxById(r.diff);if(t)diff.push({r,t,sug:1});else pend.push({r})}else pend.push({r})}
+  // cobranças de 99/Uber sem recibo, dentro do período coberto pelos recibos de cada app
+  const norc=[];for(const src of['99','uber']){const rs=allRc().filter(r=>r.src===src);if(!rs.length)continue;
+    const lo=rs.reduce((a,r)=>r.date<a?r.date:a,'9999'),hi=addDaysIso(rs.reduce((a,r)=>r.date>a?r.date:a,''),5);
+    for(const t of allTx())if(t.kind==='d'&&!t.rcid&&RC_RE[src].test(norm2(t.desc))&&t.date>=lo&&t.date<=hi&&inS(t.date)&&!diff.some(x=>x.t&&x.t.id===t.id))norc.push({t,src,dup:allTx().some(o=>o!==t&&o.kind==='d'&&o.rcid&&o.date===t.date&&Math.abs(o.amt-t.amt)<=.05)})}
+  // gasto com transporte por app no período
+  const appTx=allTx().filter(t=>t.kind==='d'&&inS(t.date)&&(t.rcid||RC_RE['99'].test(norm2(t.desc))||RC_RE.uber.test(norm2(t.desc))));
+  const total=r2(appTx.reduce((s,t)=>s+t.amt,0)+cash.reduce((s,x)=>s+x.r.amt,0)+pend.reduce((s,x)=>s+x.r.amt,0));
+  const rides=appTx.length+cash.length+pend.length,withKm=rcs.filter(r=>r.km>0),km=withKm.reduce((s,r)=>s+r.km,0),kmv=withKm.reduce((s,r)=>s+r.amt,0);
+  const per={madrugada:0,manha:0,tarde:0,noite:0};for(const r of rcs)if(r.time){const hh=+r.time.slice(0,2);per[hh<6?'madrugada':hh<12?'manha':hh<18?'tarde':'noite']++}
+  return{rcs,ok,diff,pend,cash,norc,total,rides,avg:rides?r2(total/rides):0,perKm:km?r2(kmv/km):0,per}}
+function vConfCard(){const has=allRc().length,ps=(cfg().payslips||[]);if(!has&&!ps.length)return'';
+  let line='';const d0=has?confData(S.month):null;if(d0&&(d0.rides||d0.rcs.length||d0.norc.length)){const d=d0,issues=d.diff.length+d.norc.length+d.pend.length;line=`<p style="margin:0">Uber e 99 em ${MESF[+S.month.slice(5)-1].toLowerCase()}: <b>${money(d.total)}</b> em ${d.rides} corrida${d.rides===1?'':'s'}${issues?` · <span class="st-warn">${issues} para conferir</span>`:d.rcs.length?' · <span class="st-ok">tudo conferido</span>':''}</p>`}
+  const last=ps.slice().sort((a,b)=>b.comp.localeCompare(a.comp))[0];let pl='';
+  if(last){const dep=findDeposit(last);pl=`<p style="margin:${has?'8px':'0'} 0 0">Holerite de ${MESF[+last.comp.slice(5)-1].toLowerCase()}: líquido <b>${money(last.liquido)}</b> · ${dep.st==='ok'?'<span class="st-ok">depósito conferido</span>':dep.st==='diff'?'<span class="st-warn">depósito diferente</span>':'<span class="st-bad">depósito não encontrado</span>'}</p>`}
+  if(!line&&!pl)return'';
+  return`<section class="cf"><span class="lbl" style="opacity:1;color:var(--mute)">Conferência</span>${line}${pl}<div class="act">${has?'<button class="btn sm" data-act="conf">Uber e 99</button>':''}${ps.length?'<button class="btn ghost sm" data-act="pays">Holerites</button>':''}</div></section>`}
+
+function openReceipts(){const c=cfg();
+  sheet(`<form id="f" novalidate><h2>Recibos da 99</h2><p class="hint">Escolha um ou vários PDFs de recibo. O app lê data, horário, valor, distância e forma de pagamento, e confere com o extrato.</p>
+  <label class="fld"><span>Arquivos PDF</span><input type="file" name="files" accept="application/pdf,.pdf" multiple></label>
+  <p class="hint" id="st" role="status"></p><div id="prev"></div>
+  <div class="row"><button type="button" class="btn ghost" data-act="close">Cancelar</button><button class="btn" id="go" disabled>Importar</button></div></form>`);
+  const f=$('#f'),st=$('#st');let recs=[];
+  f.files.onchange=async()=>{const fs=[...f.files.files];if(!fs.length)return;recs=[];let bad=0;st.textContent='Lendo '+fs.length+' arquivo'+(fs.length>1?'s':'')+'…';$('#go').disabled=true;
+    try{await loadPDFJS()}catch(e){st.textContent='Sem internet para carregar o leitor de PDF. Tente de novo conectado.';return}
+    for(const file of fs){try{const r=parse99(await pdfItems(file));if(r.length)recs.push(...r);else bad++}catch(e){bad++}}
+    const have=new Set(allRc().map(r=>r.id));recs.forEach(r=>{r.id=r.src+'-'+r.date+'-'+(r.time||'')+'-'+r.amt.toFixed(2);r.dup=have.has(r.id)});
+    const nw=recs.filter(r=>!r.dup);
+    st.textContent=`${nw.length} recibo${nw.length===1?'':'s'} novo${nw.length===1?'':'s'}`+(recs.length-nw.length?` · ${recs.length-nw.length} já importado${recs.length-nw.length>1?'s':''}`:'')+(bad?` · ${bad} arquivo${bad>1?'s':''} não reconhecido${bad>1?'s':''}`:'');
+    $('#prev').innerHTML=nw.length?`<ul class="rcl">${nw.slice(0,30).map(r=>`<li><div class="r1"><span>${fmtD(r.date)}/${r.date.slice(2,4)} ${esc(r.time)} · ${esc(rcLabel(r))}</span><b>${money(r.amt)}</b></div><small>${esc(r.from)} → ${esc(r.to)}${r.km?` · ${String(r.km).replace('.',',')} km`:''} · ${esc(r.pay||'—')}</small></li>`).join('')}</ul>`:'';
+    $('#go').disabled=!nw.length;$('#go').textContent=nw.length?`Importar ${nw.length}`:'Importar'};
+  f.onsubmit=e=>{e.preventDefault();const nw=recs.filter(r=>!r.dup);if(!nw.length)return;const touched=new Set();
+    for(const r of nw){const m=ym(r.date),{dup,...x}=r;x.m=Date.now();(S.rc[m]=S.rc[m]||[]).push(x);touched.add(m)}
+    touched.forEach(k=>save('m-'+k));reconcile();closeSheet();render();S.confScope=ym(nw[0].date);openConf();toast(nw.length+' recibos importados e conferidos.')}}
+
+function openConf(){reconcile();const sc=S.confScope||S.month,d=confData(sc),months=[...new Set(allRc().map(r=>ym(r.date)))].sort().reverse();
+  const ps=(cfg().payslips||[]).find(p=>p.comp===sc),vt=ps?ps.rows.filter(x=>x.t==='d'&&/vale|v\.?t\b|transporte/i.test(x.d)).reduce((s,x)=>s+x.v,0):0;
+  const rcRow=(r,extra='')=>`<div class="r1"><span>${fmtD(r.date)}/${r.date.slice(2,4)}${r.time?' '+esc(r.time):''} · ${esc(rcLabel(r))}</span><b>${money(r.amt)}</b></div><small>${esc(r.from||'')}${r.to?' → '+esc(r.to):''}${r.km?` · ${String(r.km).replace('.',',')} km`:''}${extra}</small>`;
+  const txSmall=t=>`${fmtD(t.date)} · ${esc(t.desc||'')} · ${esc(accName(t.acc))}`;
+  sheet(`<h2>Uber e 99</h2>
+  <label class="fld"><span>Período</span><select id="cscope"><option value="all" ${sc==='all'?'selected':''}>Todos os recibos</option>${[...new Set([S.month,...months])].sort().reverse().map(k=>`<option value="${k}" ${k===sc?'selected':''}>${esc(mLabel(k))}</option>`).join('')}</select></label>
+  <div class="kpi" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 6px">
+    <div class="card" style="margin:0;padding:10px"><span class="lbl">Gasto com apps</span><b style="font:700 clamp(12px,3.6vw,16px) 'Space Grotesk',Inter,sans-serif;white-space:nowrap;display:block">${money(d.total)}</b></div>
+    <div class="card" style="margin:0;padding:10px"><span class="lbl">Corridas</span><b style="font:700 clamp(12px,3.6vw,16px) 'Space Grotesk',Inter,sans-serif;white-space:nowrap;display:block">${d.rides}</b></div>
+    <div class="card" style="margin:0;padding:10px"><span class="lbl">Média</span><b style="font:700 clamp(12px,3.6vw,16px) 'Space Grotesk',Inter,sans-serif;white-space:nowrap;display:block">${money(d.avg)}</b></div></div>
+  <p class="hint">${d.perKm?`Custo médio de ${money(d.perKm)} por km. `:''}${d.rcs.length?'Horários: '+Object.entries(d.per).filter(([,v])=>v).map(([k,v])=>`${{madrugada:'madrugada',manha:'manhã',tarde:'tarde',noite:'noite'}[k]} ${v}`).join(' · ')+'.':''}${vt?` Você teve ${money(vt)} de vale-transporte descontado no holerite deste mês.`:''}</p>
+  <div class="chips"><span class="st-ok">${d.ok.length} conferida${d.ok.length===1?'':'s'}</span>${d.diff.length?`<span class="st-warn">${d.diff.length} com valor diferente</span>`:''}${d.norc.length?`<span class="st-bad">${d.norc.length} cobrança${d.norc.length>1?'s':''} sem recibo</span>`:''}${d.pend.length?`<span class="st-mute">${d.pend.length} recibo${d.pend.length>1?'s':''} sem cobrança</span>`:''}${d.cash.length?`<span class="st-mute">${d.cash.length} fora do cartão</span>`:''}</div>
+  ${d.diff.length?`<h3 style="font-size:16px;margin:16px 0 4px">Valor diferente</h3><ul class="rcl">${d.diff.map(x=>`<li>${rcRow(x.r,`<br>Cobrado: <b class="neg">${money(x.t.amt)}</b> (${x.t.amt>x.r.amt?'+':'−'}${money(Math.abs(r2(x.t.amt-x.r.amt)))}) · ${txSmall(x.t)}`)}${x.sug?`<div class="act"><button class="btn ghost sm" data-link="${esc(x.r.id)}|${esc(x.t.id)}">É esta corrida</button></div>`:''}</li>`).join('')}</ul>`:''}
+  ${d.norc.length?`<h3 style="font-size:16px;margin:16px 0 4px">Cobranças sem recibo</h3><p class="hint" style="margin:0 0 4px">O banco cobrou, mas não há recibo importado com esse valor. Confira se a corrida aconteceu.</p><ul class="rcl">${d.norc.map(x=>`<li><div class="r1"><span>${esc(x.t.desc||'')}</span><b class="neg">${money(x.t.amt)}</b></div><small>${fmtD(x.t.date)} · ${esc(accName(x.t.acc))}${x.dup?' · <span class="st-bad">possível cobrança duplicada</span>':''}</small><div class="act"><button class="btn ghost sm" data-edit="${esc(x.t.id)}">Abrir lançamento</button></div></li>`).join('')}</ul>`:''}
+  ${d.pend.length?`<h3 style="font-size:16px;margin:16px 0 4px">Recibos sem cobrança</h3><p class="hint" style="margin:0 0 4px">Ainda não apareceram no extrato. Importe o extrato do cartão ou lance como despesa.</p><ul class="rcl">${d.pend.map(x=>`<li>${rcRow(x.r,' · '+esc(x.r.pay||''))}<div class="act"><button class="btn ghost sm" data-addrc="${esc(x.r.id)}">Lançar despesa</button></div></li>`).join('')}</ul>${d.pend.length>1?`<button class="btn ghost" id="addall" style="width:100%">Lançar as ${d.pend.length} como despesa</button>`:''}`:''}
+  ${d.cash.length?`<h3 style="font-size:16px;margin:16px 0 4px">Pagas fora do cartão</h3><ul class="rcl">${d.cash.map(x=>`<li>${rcRow(x.r,' · '+esc(x.r.pay||''))}</li>`).join('')}</ul>`:''}
+  ${d.ok.length?`<details style="margin-top:14px"><summary style="cursor:pointer;font-weight:600">Conferidas (${d.ok.length})</summary><ul class="rcl">${d.ok.map(x=>`<li>${rcRow(x.r,x.t?'<br>'+txSmall(x.t):'')}</li>`).join('')}</ul></details>`:''}
+  ${!d.rcs.length&&!d.norc.length?'<p class="empty">Nenhum recibo neste período.</p>':''}
+  <div class="row"><button class="btn ghost" data-act="imp99">Importar recibos</button><button class="btn" data-act="close">Fechar</button></div>`);
+  $('#cscope').onchange=e=>{S.confScope=e.target.value;openConf()};
+  const acc0=()=>{const c=cfg();return(accOf(c.apAcc)&&c.apAcc)||(c.accounts.find(a=>a.type==='cartao')||c.accounts[0]||{}).id};
+  const addRc=id=>{const r=allRc().find(x=>x.id===id);if(!r||r.tx)return;if(!cfg().accounts.length){toast('Cadastre uma conta primeiro.');return}
+    const t={id:uid(),kind:'d',amt:r.amt,desc:rcLabel(r).trim()+(r.to?' · '+r.to:''),date:r.date,acc:acc0(),cat:guessCat('uber','d')||'transp',rcid:r.id};
+    if(!cfg().cats.some(c=>c.id===t.cat))t.cat=guessCat('',"d");putTx(t);r.tx=t.id;r.m=Date.now();save('m-'+ym(r.date))};
+  document.querySelectorAll('[data-addrc]').forEach(b=>b.onclick=()=>{addRc(b.dataset.addrc);render();openConf();toast('Despesa lançada.')});
+  const all=$('#addall');if(all)all.onclick=()=>{d.pend.forEach(x=>addRc(x.r.id));render();openConf();toast(d.pend.length+' despesas lançadas.')};
+  document.querySelectorAll('[data-link]').forEach(b=>b.onclick=()=>{const[rid,tid]=b.dataset.link.split('|'),r=allRc().find(x=>x.id===rid),[t,k]=findTxById(tid);if(!r||!t)return;
+    r.tx=t.id;delete r.diff;r.m=Date.now();t.rcid=r.id;t.m=Date.now();save('m-'+ym(r.date));save('m-'+k);openConf();toast('Vinculado.')});
+  document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{const[t]=findTxById(b.dataset.edit);if(t)openTx(t)})}
+
+// ================= HOLERITES =================
+function findDeposit(p){const nm=addMonths(p.comp,1),lo=p.comp+'-20',hi=nm+'-15',r=allTx().filter(t=>t.kind==='r'&&t.date>=lo&&t.date<=hi);
+  const ex=r.find(t=>t.ps===p.id)||r.find(t=>Math.abs(t.amt-p.liquido)<=.05);if(ex)return{st:Math.abs(ex.amt-p.liquido)<=.05?'ok':'diff',t:ex};
+  const near=r.filter(t=>Math.abs(t.amt-p.liquido)/p.liquido<=.15).sort((a,b)=>Math.abs(a.amt-p.liquido)-Math.abs(b.amt-p.liquido))[0];
+  return near?{st:'diff',t:near}:{st:'none'}}
+const dGroup=d=>{const n=norm2(d).replace(/\./g,'');return/inss|irrf|imposto|i r\b/.test(n)?'Impostos':/emp|emprest|consig|cred trab/.test(n)?'Empréstimos':/vale|transporte|refei|alimenta|plano|saude|odont|seguro|coparti|farm/.test(n)?'Benefícios':'Outros'};
+function openPayslipImport(){
+  sheet(`<form id="f" novalidate><h2>Holerite</h2><p class="hint">Escolha o PDF do holerite (pode ser mais de um mês). O app lê vencimentos, descontos e o líquido, e confere com o depósito no extrato.</p>
+  <label class="fld"><span>Arquivos PDF</span><input type="file" name="files" accept="application/pdf,.pdf" multiple></label>
+  <p class="hint" id="st" role="status"></p><div id="prev"></div>
+  <div class="row"><button type="button" class="btn ghost" data-act="close">Cancelar</button><button class="btn" id="go" disabled>Salvar</button></div></form>`);
+  const f=$('#f'),st=$('#st');let got=[];
+  f.files.onchange=async()=>{const fs=[...f.files.files];if(!fs.length)return;got=[];let bad=0;st.textContent='Lendo…';$('#go').disabled=true;
+    try{await loadPDFJS()}catch(e){st.textContent='Sem internet para carregar o leitor de PDF. Tente de novo conectado.';return}
+    for(const file of fs){try{const p=parseHolerite(await pdfItems(file));if(p&&p.comp&&p.rows.length&&p.liquido>0)got.push(p);else bad++}catch(e){bad++}}
+    st.textContent=got.length?'':'Não consegui ler esse holerite. Me mande o PDF para eu ajustar a leitura.';if(bad&&got.length)st.textContent=bad+' arquivo(s) não reconhecido(s).';
+    $('#prev').innerHTML=got.map(p=>`<div class="card"><b>${esc(mLabel(p.comp))}</b> · ${esc(p.emp)}<p class="meta" style="margin:6px 0 0">Bruto ${money(p.bruto)} · Descontos ${money(p.desc)} · Líquido <b>${money(p.liquido)}</b></p>
+      ${p.check?'<p class="hint st-ok" style="margin:6px 0 0">Totais conferem com os itens.</p>':'<p class="hint st-warn" style="margin:6px 0 0">Os totais não bateram com a soma dos itens. Confira os valores depois.</p>'}</div>`).join('');
+    $('#go').disabled=!got.length};
+  f.onsubmit=e=>{e.preventDefault();if(!got.length)return;const c=ensureCfg();c.payslips=c.payslips||[];
+    for(const p of got){const id=p.comp+'|'+norm2(p.emp).slice(0,20),x={id,comp:p.comp,emp:p.emp,bruto:p.bruto,desc:p.desc,liquido:p.liquido,fgts:p.fgts,base:p.base,check:p.check,rows:p.rows};
+      const i=c.payslips.findIndex(y=>y.id===id);if(i>=0)c.payslips[i]=x;else c.payslips.push(x)}
+    save('config');closeSheet();render();S.psSel=got[0].comp+'|'+norm2(got[0].emp).slice(0,20);openPayslips();toast('Holerite salvo.')}}
+function openPayslips(){const ps=(cfg().payslips||[]).slice().sort((a,b)=>b.comp.localeCompare(a.comp));if(!ps.length){openPayslipImport();return}
+  const p=ps.find(x=>x.id===S.psSel)||ps[0],dep=findDeposit(p),ds=p.rows.filter(x=>x.t==='d'),vs=p.rows.filter(x=>x.t==='v');
+  const groups={};for(const x of ds)(groups[dGroup(x.d)]=groups[dGroup(x.d)]||[]).push(x);
+  const pct=v=>p.bruto?(v/p.bruto*100).toFixed(1).replace('.',',')+'%':'';
+  const emp=(groups['Empréstimos']||[]).reduce((s,x)=>s+x.v,0);
+  sheet(`<h2>Holerites</h2>
+  <label class="fld"><span>Mês</span><select id="psel">${ps.map(x=>`<option value="${esc(x.id)}" ${x.id===p.id?'selected':''}>${esc(mLabel(x.comp))} · ${esc(x.emp)}</option>`).join('')}</select></label>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+    <div class="card" style="margin:0;padding:10px"><span class="lbl">Bruto</span><b style="font:700 clamp(12px,3.6vw,16px) 'Space Grotesk',Inter,sans-serif;white-space:nowrap;display:block">${money(p.bruto)}</b></div>
+    <div class="card" style="margin:0;padding:10px"><span class="lbl">Descontos</span><b class="neg" style="font:700 clamp(12px,3.6vw,16px) 'Space Grotesk',Inter,sans-serif;white-space:nowrap;display:block">${money(p.desc)}</b></div>
+    <div class="card" style="margin:0;padding:10px"><span class="lbl">Líquido</span><b class="pos" style="font:700 clamp(12px,3.6vw,16px) 'Space Grotesk',Inter,sans-serif;white-space:nowrap;display:block">${money(p.liquido)}</b></div></div>
+  <div class="card" style="margin-top:10px">${dep.st==='ok'?`<p style="margin:0" class="st-ok"><b>Depósito conferido</b></p><p class="meta" style="margin:4px 0 0">${money(dep.t.amt)} em ${fmtD(dep.t.date)} · ${esc(accName(dep.t.acc))}</p>`
+    :dep.st==='diff'?`<p style="margin:0" class="st-warn"><b>Depósito diferente do líquido</b></p><p class="meta" style="margin:4px 0 0">Caiu ${money(dep.t.amt)} em ${fmtD(dep.t.date)} (${dep.t.amt>p.liquido?'+':'−'}${money(Math.abs(r2(dep.t.amt-p.liquido)))}). Vale perguntar ao RH.</p>`
+    :`<p style="margin:0" class="st-bad"><b>Depósito não encontrado</b></p><p class="meta" style="margin:4px 0 0">Não achei uma receita de ${money(p.liquido)} entre ${fmtD(p.comp+'-20')} e ${fmtD(addMonths(p.comp,1)+'-15')}. Importe o extrato ou lance o salário.</p><div class="act"><button class="btn sm" id="lanc">Lançar salário de ${money(p.liquido)}</button></div>`}</div>
+  <p style="margin:14px 0 6px">Dos ${money(p.bruto)} brutos, <b>${money(p.desc)} (${pct(p.desc)})</b> ficam no holerite.${emp?` Só de empréstimos consignados são <b class="neg">${money(r2(emp))} por mês (${pct(emp)})</b>.`:''}</p>
+  ${Object.entries(groups).map(([g,xs])=>`<h3 style="font-size:15px;margin:14px 0 4px">${g} · ${money(r2(xs.reduce((s,x)=>s+x.v,0)))}</h3><ul class="rcl">${xs.map(x=>`<li><div class="r1"><span>${esc(x.d)}</span><b class="neg">−${money(x.v)}</b></div><small>${pct(x.v)} do bruto${x.ref&&x.ref!==x.v?` · referência ${String(x.ref).replace('.',',')}`:''}</small></li>`).join('')}</ul>`).join('')}
+  <h3 style="font-size:15px;margin:14px 0 4px">Vencimentos</h3><ul class="rcl">${vs.map(x=>`<li><div class="r1"><span>${esc(x.d)}</span><b class="pos">+${money(x.v)}</b></div></li>`).join('')}</ul>
+  ${p.fgts?`<p class="hint" style="margin-top:10px">FGTS depositado pela empresa: ${money(p.fgts)} (não sai do seu salário).</p>`:''}
+  ${!p.check?'<p class="hint st-warn">Os totais deste holerite não bateram com a soma dos itens lidos.</p>':''}
+  ${ps.length>1?`<h3 style="font-size:15px;margin:16px 0 4px">Histórico</h3><table style="width:100%;border-collapse:collapse;font-size:14px">${ps.slice(0,12).map(x=>`<tr style="border-bottom:1px solid var(--line)"><td style="padding:6px 0">${MES[+x.comp.slice(5)-1]}/${x.comp.slice(2,4)}</td><td style="text-align:right">${money(x.bruto)}</td><td style="text-align:right" class="neg">−${money(x.desc)}</td><td style="text-align:right"><b>${money(x.liquido)}</b></td></tr>`).join('')}</table>`:''}
+  <div class="row"><button class="btn danger" id="pdel">Excluir</button><button class="btn ghost" data-act="impPay">Importar outro</button><button class="btn" data-act="close">Fechar</button></div>`);
+  $('#psel').onchange=e=>{S.psSel=e.target.value;openPayslips()};
+  const l=$('#lanc');if(l)l.onclick=()=>{const c=cfg();if(!c.accounts.length){toast('Cadastre uma conta primeiro.');return}
+    const acc=(c.accounts.find(a=>a.type!=='cartao')||c.accounts[0]).id,cat=(c.cats.find(x=>x.id==='salario')||c.cats.find(x=>x.kind==='r')||{}).id;
+    openTx(null,{kind:'r',amt:p.liquido,desc:'Salário '+p.emp.split(' ')[0]+' '+MES[+p.comp.slice(5)-1],cat,acc,ps:p.id,date:addMonths(p.comp,1)+'-05'})};
+  $('#pdel').onclick=async()=>{if(!await ask('Excluir o holerite de '+mLabel(p.comp)+'?','Excluir'))return;const c=ensureCfg();c.payslips=c.payslips.filter(x=>x.id!==p.id);save('config');S.psSel='';closeSheet();render()}}
 
 // ================= METAS / CAIXINHAS =================
 const goalSaved=g=>r2((g.moves||[]).reduce((s,m)=>s+m.v,0));
@@ -965,7 +1218,7 @@ function lockInit(){
 }
 
 function useLocal(){S.mode='local';
-  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k||!/^fin:(config|m-\d{4}-\d{2})$/.test(k))continue;const b=JSON.parse(localStorage.getItem(k)),id=k.slice(4);if(id==='config')S.cfg=b;else if(id.startsWith('m-')&&b&&Array.isArray(b.tx)){if(b.tx.length)S.months[id.slice(2)]=b.tx;if(Array.isArray(b.del))S.dels[id.slice(2)]=b.del}}}catch(e){}
+  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k||!/^fin:(config|m-\d{4}-\d{2})$/.test(k))continue;const b=JSON.parse(localStorage.getItem(k)),id=k.slice(4);if(id==='config')S.cfg=b;else if(id.startsWith('m-')&&b&&Array.isArray(b.tx)){if(b.tx.length)S.months[id.slice(2)]=b.tx;if(Array.isArray(b.del))S.dels[id.slice(2)]=b.del;if(Array.isArray(b.rc)&&b.rc.length)S.rc[id.slice(2)]=b.rc}}}catch(e){}
   try{S.bk=localStorage.getItem('fin:lastbk')||''}catch(e){}
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
   store={set:async(k,b)=>{try{localStorage.setItem('fin:'+k,JSON.stringify(b))}catch(e){throw{code:e&&e.name==='QuotaExceededError'?'quota_exceeded':'erro'}}},del:async k=>{localStorage.removeItem('fin:'+k)}};
