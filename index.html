@@ -294,7 +294,7 @@ const fatMonth=(t,card)=>+t.date.slice(8)>(+card.closeDay||31)?addMonths(ym(t.da
 function fatura(card,M){let v=0;for(const t of allTx())if(t.acc===card.id&&t.kind!=='t'&&fatMonth(t,card)===M)v+=t.kind==='d'?t.amt:-t.amt;return r2(v)}
 const fatDue=(card,M)=>(+card.dueDay||10)>(+card.closeDay||31)?mkDate(M,+card.dueDay||10):mkDate(addMonths(M,1),+card.dueDay||10);
 const fatPaid=(card,M)=>allTx().some(t=>t.fat===card.id+'|'+M);
-const recPaid=(r,M)=>monthTx(M).some(t=>t.rid===r.id);
+const recPaid=(r,M)=>!!r.payroll||monthTx(M).some(t=>t.rid===r.id);
 const recActive=(r,M)=>(!r.start||M>=r.start)&&(!r.end||M<=r.end);
 const mv=v=>{v=Math.abs(+v||0);return v?'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):''};
 function avgRec(r){const ps=allTx().filter(t=>t.rid===r.id).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,3);return ps.length?r2(ps.reduce((s,t)=>s+t.amt,0)/ps.length):+r.amount||0}
@@ -312,7 +312,7 @@ function alerts(m){const c=cfg(),out=[],sp=spent(m);
   for(const cat of c.cats){const b=+c.budgets[cat.id]||0;if(!b)continue;const s=sp[cat.id]||0;
     if(s>b)out.push(`<li class="bad"><span>${esc(cat.name)} passou do orçamento: ${money(s)} de ${money(b)}</span></li>`);
     else if(s>=.8*b)out.push(`<li><span>${esc(cat.name)} já usou ${Math.round(s/b*100)}% do orçamento</span></li>`)}
-  if(m===curM()){for(const r of c.recur){if(!recActive(r,m)||recPaid(r,m)||r.auto)continue;const n=days(mkDate(m,+r.day));
+  if(m===curM()){for(const r of c.recur){if(r.payroll||!recActive(r,m)||recPaid(r,m)||r.auto)continue;const n=days(mkDate(m,+r.day));
     if(n<0)out.push(`<li class="bad"><span>${esc(r.name)} venceu há ${-n} dia${n===-1?'':'s'} · ${money(r.amount)}</span><button class="btn sm" data-act="payRec" data-id="${esc(r.id)}">Pagar</button></li>`);
     else if(n<=5)out.push(`<li><span>${esc(r.name)} ${n===0?'vence hoje':'vence em '+n+' dia'+(n===1?'':'s')} · ${money(r.amount)}</span><button class="btn sm" data-act="payRec" data-id="${esc(r.id)}">Pagar</button></li>`)}
     for(const a of c.accounts.filter(a=>a.type==='cartao'))for(const M of[addMonths(m,-1),m]){const due=fatDue(a,M),n=days(due),v=fatura(a,M);
@@ -373,12 +373,12 @@ function vAcc(){const c=cfg();
   <div class="sec"><div class="hdr"><h2>Backup manual</h2></div><p class="hint">Guarde uma cópia dos seus dados de vez em quando. O arquivo também serve para levar tudo para outro lugar.</p><div class="toolbar"><button class="btn ghost" data-act="exportBk">Exportar backup</button><button class="btn ghost" data-act="restoreBk">Restaurar backup</button></div></div>`}
 
 function vRec(){const c=cfg(),M=S.month,all=c.recur.slice().sort((a,b)=>a.day-b.day),list=all.filter(r=>recActive(r,M)),off=all.filter(r=>!recActive(r,M));
-  const tot=list.filter(r=>r.kind!=='r').reduce((s,r)=>s+(+(r.vary?avgRec(r):r.amount)||0),0);
+  const tot=list.filter(r=>r.kind!=='r'&&!r.payroll).reduce((s,r)=>s+(+(r.vary?avgRec(r):r.amount)||0),0),totP=list.filter(r=>r.payroll).reduce((s,r)=>s+(+r.amount||0),0);
   const prazo=r=>r.end?(()=>{const n=monthsBetween(M,r.end);return n<0?'encerrada':n===0?'último mês':`termina ${MES[+r.end.slice(5)-1]}/${r.end.slice(2,4)} · faltam ${n+1}`})():'';
   return `<div class="sec" style="margin-top:0"><div class="hdr"><h2>Contas fixas de ${MESF[+M.slice(5)-1].toLowerCase()}</h2><button class="btn ghost sm" data-act="newRec">Nova</button></div>
-  ${list.length?`<p class="sum" style="margin:0 0 12px">Total fixo de despesas: <b>${money(tot)}</b> por mês</p>`+list.map(r=>{const paid=recPaid(r,M),due=mkDate(M,+r.day),n=days(due);
-    const lt=paid&&monthTx(M).find(t=>t.rid===r.id),st=paid?`<span class="chip ok">${lt&&lt.auto?'Lançada':'Paga'}${lt&&Math.abs(lt.amt-(+r.amount))>.01?' · '+money(lt.amt):''}</span>`:n<0?'<span class="chip bad">Vencida</span>':n<=5?`<span class="chip warn">${n===0?'Vence hoje':'Vence em '+n+'d'}</span>`:'<span class="chip">A vencer</span>';
-    return `<div class="card"><div class="top"><span class="dot" style="background:${esc(catOf(r.cat).color)}"></span><b>${esc(r.name)}</b><button class="btn ghost sm" data-act="editRec" data-id="${esc(r.id)}">Editar</button></div><p class="bal ${r.kind==='r'?'pos':''}">${money(+r.amount)}</p><p class="meta">Todo dia ${esc(r.day)} · ${esc(catOf(r.cat).name)} · ${esc(accName(r.acc))}${r.vary?' · valor variável':''}${prazo(r)?' · '+prazo(r):''}</p><div class="act">${st}${r.auto?'<span class="chip">Automática</span>':''}${paid?'':`<button class="btn sm" data-act="payRec" data-id="${esc(r.id)}">${r.kind==='r'?'Recebi':'Pagar'}</button>`}</div></div>`}).join(''):all.length?'<p class="empty">Nenhuma conta fixa neste mês.</p>':'<p class="empty">Cadastre aluguel, assinaturas, escola, financiamento, salário… Com prazo, o app cuida de todos os meses: avisa, lança sozinho se você quiser e marca como paga quando importar o extrato.</p>'}
+  ${list.length?`<p class="sum" style="margin:0 0 12px">Total fixo de despesas: <b>${money(tot)}</b> por mês${totP?` · descontado no holerite: <b>${money(totP)}</b>`:''}</p>`+list.map(r=>{const paid=recPaid(r,M),due=mkDate(M,+r.day),n=days(due);
+    const lt=paid&&monthTx(M).find(t=>t.rid===r.id),st=r.payroll?'<span class="chip">Descontado no holerite</span>':paid?`<span class="chip ok">${lt&&lt.auto?'Lançada':'Paga'}${lt&&Math.abs(lt.amt-(+r.amount))>.01?' · '+money(lt.amt):''}</span>`:r.kind==='r'?(n<0?'<span class="chip warn">Ainda não caiu</span>':`<span class="chip">${n===0?'Cai hoje':'Cai em '+n+'d'}</span>`):n<0?'<span class="chip bad">Vencida</span>':n<=5?`<span class="chip warn">${n===0?'Vence hoje':'Vence em '+n+'d'}</span>`:'<span class="chip">A vencer</span>';
+    return `<div class="card"><div class="top"><span class="dot" style="background:${esc(catOf(r.cat).color)}"></span><b>${esc(r.name)}</b><button class="btn ghost sm" data-act="editRec" data-id="${esc(r.id)}">Editar</button></div><p class="bal ${r.kind==='r'?'pos':''}">${money(+r.amount)}</p><p class="meta">Todo dia ${esc(r.day)} · ${esc(catOf(r.cat).name)} · ${esc(accName(r.acc))}${r.vary?' · valor variável':''}${prazo(r)?' · '+prazo(r):''}</p><div class="act">${st}${r.auto&&!r.payroll?'<span class="chip">Automática</span>':''}${paid?'':`<button class="btn sm" data-act="payRec" data-id="${esc(r.id)}">${r.kind==='r'?'Recebi':'Pagar'}</button>`}</div></div>`}).join(''):all.length?'<p class="empty">Nenhuma conta fixa neste mês.</p>':'<p class="empty">Cadastre aluguel, assinaturas, escola, financiamento, salário… Com prazo, o app cuida de todos os meses: avisa, lança sozinho se você quiser e marca como paga quando importar o extrato.</p>'}
   ${off.length?`<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600">Fora deste mês (${off.length})</summary>${off.map(r=>`<div class="card" style="margin-top:8px"><div class="top"><b>${esc(r.name)}</b><button class="btn ghost sm" data-act="editRec" data-id="${esc(r.id)}">Editar</button></div><p class="meta">${r.start&&M<r.start?'Começa em '+MES[+r.start.slice(5)-1]+'/'+r.start.slice(2,4):'Terminou em '+MES[+r.end.slice(5)-1]+'/'+r.end.slice(2,4)} · ${money(+r.amount)}</p></div>`).join('')}</details>`:''}</div>`}
 
 function vBud(){const c=cfg(),M=S.month,sp=spent(M);const ds=c.cats.filter(x=>x.kind==='d'),rs=c.cats.filter(x=>x.kind==='r');
@@ -477,6 +477,7 @@ function openRec(r,pre){const c=cfg();if(!c.accounts.length){toast('Cadastre uma
   <label class="fld"><span>Nome</span><input name="name" value="${esc(x.name)}" maxlength="50" placeholder="Ex.: Aluguel, Netflix, Salário"></label>
   <div class="two"><label class="fld"><span>Valor</span><input name="amount" ${MI} value="${x.amount===''?'':mv(x.amount)}" placeholder="R$ 0,00"></label><label class="fld"><span>Vence todo dia</span><input name="day" type="number" min="1" max="31" inputmode="numeric" value="${esc(x.day)}"></label></div>
   <label class="chk"><input type="checkbox" name="vary" ${x.vary?'checked':''}> O valor muda a cada mês (luz, água, cartão)</label>
+  <label class="chk" data-k="pr"><input type="checkbox" name="payroll" ${x.payroll?'checked':''}> Descontado direto no holerite (não sai da conta)</label>
   <label class="fld"><span>Categoria</span><select name="cat"></select></label>
   <label class="fld"><span>Conta ou cartão</span><select name="acc">${accOpts(x.acc)}</select></label>
   <h3 style="font-size:16px;margin:16px 0 8px">Prazo</h3>
@@ -496,12 +497,13 @@ function openRec(r,pre){const c=cfg();if(!c.accounts.length){toast('Cadastre uma
     f.querySelector('[data-k=nm]').hidden=d!=='n';f.querySelector('[data-k=end]').hidden=d!=='ate';
     const auto=f.auto.value==='1';f.querySelector('[data-k=ahint]').textContent=auto?'No dia do vencimento o app lança sozinho, como um débito automático. Se o extrato trouxer o pagamento, ele junta os dois.':'Fica na aba Fixas com o status, avisa perto do vencimento e você confirma com um toque. Se importar o extrato, o app marca como paga sozinho.';
     f.querySelector('[data-k=back]').hidden=!(auto&&st<curM()&&isNew);
+    const pr=f.payroll.checked;f.querySelector('[data-k=pr]').hidden=f.kind.value!=='d';for(const el of f.querySelectorAll('input[name=auto]'))el.closest('.seg').hidden=pr;f.querySelector('[data-k=ahint]').hidden=pr;if(pr)f.querySelector('[data-k=back]').hidden=true;
     const n=en?monthsBetween(st,en)+1:0;$('#rsum').textContent=en?(n<1?'O último mês é antes do início.':`${n} ${n===1?'mês':'meses'} · de ${MES[+st.slice(5)-1]}/${st.slice(2,4)} a ${MES[+en.slice(5)-1]}/${en.slice(2,4)}${a?' · total '+money(r2(a*n)):''}`):`Todo mês a partir de ${MES[+st.slice(5)-1]}/${st.slice(2,4)}, sem data para acabar.`};
   f.addEventListener('change',e=>{if(e.target.name==='kind')sync();upd()});f.addEventListener('input',upd);f.name.addEventListener('change',()=>{if(isNew){const g=guessCat(f.name.value,f.kind.value);if(g)f.cat.value=g}});sync();upd();
   f.onsubmit=e=>{e.preventDefault();const name=f.name.value.trim(),amount=num(f.amount.value),day=parseInt(f.day.value);
     if(!name||!(amount>0)||!(day>=1&&day<=31)){toast('Preencha nome, valor e dia.');return}
     const start=f.start.value||curM(),end=endOf();if(end&&end<start){toast('O último mês é antes do início.');return}
-    const nr={id:x.id,name,amount:r2(amount),day,kind:f.kind.value,cat:f.cat.value,acc:f.acc.value,start,end,auto:f.auto.value==='1',vary:f.vary.checked,since:x.since||(f.back&&f.back.checked?start:curM())};
+    const nr={id:x.id,name,amount:r2(amount),day,kind:f.kind.value,cat:f.cat.value,acc:f.acc.value,start,end,auto:f.auto.value==='1'&&!(f.kind.value==='d'&&f.payroll.checked),vary:f.vary.checked,payroll:f.kind.value==='d'&&f.payroll.checked,since:x.since||(f.back&&f.back.checked?start:curM())};
     if(!isNew&&nr.auto&&!x.auto)nr.since=curM();
     const cc=ensureCfg(),i=cc.recur.findIndex(y=>y.id===x.id);if(i>=0)cc.recur[i]=nr;else cc.recur.push(nr);
     save('config');closeSheet();autoPost();render();toast('Conta fixa salva.')};
@@ -698,7 +700,7 @@ const addDays=(d,n)=>{const x=new Date(d+'T12:00');x.setDate(x.getDate()+n);retu
 const WHEN=n=>n===0?'vence hoje':n===1?'vence amanhã':n>1?'vence em '+n+' dias':'venceu ontem';
 function buildReminders(){const c=cfg(),t0=today(),M=curM(),by={};
   const add=(on,pri,text)=>{if(on<t0)return;(by[on]=by[on]||[]).push({pri,text})};
-  for(const r of c.recur)if(r.kind!=='r')for(const m of[M,addMonths(M,1),addMonths(M,2)]){if(!recActive(r,m)||recPaid(r,m))continue;const due=mkDate(m,+r.day),v=r.vary?avgRec(r):+r.amount;
+  for(const r of c.recur)if(r.kind!=='r'&&!r.payroll)for(const m of[M,addMonths(M,1),addMonths(M,2)]){if(!recActive(r,m)||recPaid(r,m))continue;const due=mkDate(m,+r.day),v=r.vary?avgRec(r):+r.amount;
     if(r.auto){add(addDays(due,-1),1,`${r.name} será lançada amanhã · ${r.vary?'cerca de ':''}${money(v)}`);continue}
     for(const off of[3,1,0,-1])add(addDays(due,-off),off<=0?0:1,`${r.name} ${WHEN(off)} · ${r.vary?'cerca de ':''}${money(v)}`)}
   for(const a of c.accounts.filter(a=>a.type==='cartao'))for(const fm of[addMonths(M,-1),M,addMonths(M,1),addMonths(M,2)]){if(fatPaid(a,fm))continue;const v=fatura(a,fm);if(!(v>0))continue;const due=fatDue(a,fm);
@@ -1030,17 +1032,19 @@ function openPayslips(){const ps=(cfg().payslips||[]).slice().sort((a,b)=>b.comp
   ${p.fgts?`<p class="hint" style="margin-top:10px">FGTS depositado pela empresa: ${money(p.fgts)} (não sai do seu salário).</p>`:''}
   ${!p.check?'<p class="hint st-warn">Os totais deste holerite não bateram com a soma dos itens lidos.</p>':''}
   ${ps.length>1?`<h3 style="font-size:15px;margin:16px 0 4px">Histórico</h3><table style="width:100%;border-collapse:collapse;font-size:14px">${ps.slice(0,12).map(x=>`<tr style="border-bottom:1px solid var(--line)"><td style="padding:6px 0">${MES[+x.comp.slice(5)-1]}/${x.comp.slice(2,4)}</td><td style="text-align:right">${money(x.bruto)}</td><td style="text-align:right" class="neg">−${money(x.desc)}</td><td style="text-align:right"><b>${money(x.liquido)}</b></td></tr>`).join('')}</table>`:''}
+  <button class="btn" id="mkrec" style="width:100%;margin-top:14px">Criar salário e empréstimos como contas fixas</button>
   <div class="row"><button class="btn danger" id="pdel">Excluir</button><button class="btn ghost" data-act="impPay">Importar outro</button><button class="btn" data-act="close">Fechar</button></div>`);
   $('#psel').onchange=e=>{S.psSel=e.target.value;openPayslips()};
   const l=$('#lanc');if(l)l.onclick=()=>{const c=cfg();if(!c.accounts.length){toast('Cadastre uma conta primeiro.');return}
     const acc=(c.accounts.find(a=>a.type!=='cartao')||c.accounts[0]).id,cat=(c.cats.find(x=>x.id==='salario')||c.cats.find(x=>x.kind==='r')||{}).id;
     openTx(null,{kind:'r',amt:p.liquido,desc:'Salário '+p.emp.split(' ')[0]+' '+MES[+p.comp.slice(5)-1],cat,acc,ps:p.id,date:addMonths(p.comp,1)+'-05'})};
+  $('#mkrec').onclick=()=>openPayslipSetup(p,dep);
   $('#pdel').onclick=async()=>{if(!await ask('Excluir o holerite de '+mLabel(p.comp)+'?','Excluir'))return;const c=ensureCfg();c.payslips=c.payslips.filter(x=>x.id!==p.id);save('config');S.psSel='';closeSheet();render()}}
 
 // ================= AUTOMAÇÕES =================
 // lança contas fixas automáticas no vencimento (id fixo por mês: dois aparelhos não duplicam)
 function autoPost(){const c=cfg(),t0=today(),cur=curM();let n=0;
-  for(const r of c.recur){if(!r.auto)continue;let M=r.since||r.start||cur;if(r.start&&M<r.start)M=r.start;
+  for(const r of c.recur){if(!r.auto||r.payroll)continue;let M=r.since||r.start||cur;if(r.start&&M<r.start)M=r.start;
     for(let g=0;M<=cur&&g<120;M=addMonths(M,1),g++){if(!recActive(r,M))continue;const due=mkDate(M,+r.day);if(due>t0||recPaid(r,M))continue;
       const id='r-'+r.id+'-'+M;if(findTx(id)||(S.dels[M]||[]).includes(id))continue;
       putTx({id,kind:r.kind,amt:r2(r.vary?avgRec(r):+r.amount),desc:r.name,date:due,acc:accOf(r.acc)?r.acc:(c.accounts[0]||{}).id,cat:r.cat,rid:r.id,auto:1});n++}}
@@ -1048,7 +1052,7 @@ function autoPost(){const c=cfg(),t0=today(),cur=curM();let n=0;
 // ao importar extrato: reconhece pagamentos de contas fixas
 function matchRecur(newTx){const c=cfg();let n=0;
   for(const t of newTx){if(t.rid||t.kind==='t')continue;const td=norm(t.desc).split(' ').filter(w=>w.length>=4);
-    for(const M of[ym(t.date),addMonths(ym(t.date),-1)]){const r=c.recur.find(r=>{if(r.kind!==t.kind||!recActive(r,M))return false;
+    for(const M of[ym(t.date),addMonths(ym(t.date),-1)]){const r=c.recur.find(r=>{if(r.payroll||r.kind!==t.kind||!recActive(r,M))return false;
         const autoId='r-'+r.id+'-'+M,paidBy=monthTx(M).filter(x=>x.rid===r.id&&x.id!==autoId);if(paidBy.length)return false;
         if(Math.abs(days2(t.date,mkDate(M,+r.day)))>7)return false;const ref=r.vary?avgRec(r):+r.amount,diff=Math.abs(t.amt-ref)/Math.max(ref,1);
         const nameOk=norm(r.name).split(' ').some(w=>w.length>=4&&td.includes(w));return diff<=.02||(nameOk&&diff<=(r.vary?.4:.1))});
@@ -1090,6 +1094,36 @@ function parseSmart(s){const c=cfg(),T=today(),out={},src=String(s||'');let t=' 
   for(const cc of c.cats){const cn=norm2(cc.name);if(cn.length>3&&t.includes(cn)&&(!out.kind||cc.kind===out.kind)){out.cat=cc.id;out.kind=out.kind||cc.kind;break}}
   out.kind=out.kind||'d';if(!out.cat&&out.desc)out.cat=guessCat(out.desc,out.kind);
   return out}
+
+function openPayslipSetup(p,dep){const c=cfg();if(!c.accounts.length){toast('Cadastre a conta onde o salário cai.');openAcc(null,'conta');return}
+  const loans=p.rows.filter(x=>x.t==='d'&&dGroup(x.d)==='Empréstimos'),ek=norm2(p.emp).replace(/[^a-z]/g,'').slice(0,12);
+  const ex=id=>c.recur.find(r=>r.id===id),salId='sal-'+ek,sal=ex(salId);
+  const depAcc=dep&&dep.t?dep.t.acc:(c.accounts.find(a=>a.type!=='cartao')||c.accounts[0]).id,depDay=dep&&dep.t?+dep.t.date.slice(8):(sal?sal.day:5);
+  const lid=x=>'emp-'+ek+'-'+(x.d.match(/\d{6,}/)||[x.c])[0];
+  const left=x=>{const r=ex(lid(x));return r&&r.end?monthsBetween(p.comp,r.end)+1:''};
+  sheet(`<form id="f" novalidate><h2>Contas fixas do holerite</h2>
+  <p class="hint">Vou cadastrar o salário como receita fixa e cada empréstimo como despesa fixa descontada no holerite. Assim eles aparecem na previsão e nos próximos meses, e o app avisa quando um empréstimo acabar.</p>
+  <h3 style="font-size:16px;margin:12px 0 8px">Salário (líquido)</h3>
+  <div class="two"><label class="fld"><span>Valor</span><input name="sv" ${MI} value="${mv(sal?sal.amount:p.liquido)}"></label><label class="fld"><span>Cai todo dia</span><input name="sd" type="number" min="1" max="31" inputmode="numeric" value="${depDay}"></label></div>
+  <label class="fld"><span>Conta</span><select name="sa">${accOpts(sal?sal.acc:depAcc,a=>a.type!=='cartao')}</select></label>
+  <p class="hint" style="margin-top:-4px">Quando você importar o extrato, o app reconhece o depósito e marca como recebido.</p>
+  ${loans.length?`<h3 style="font-size:16px;margin:16px 0 8px">Empréstimos descontados no holerite</h3>`+loans.map((x,i)=>`<div class="card" style="padding:12px"><div class="r1" style="display:flex;justify-content:space-between;gap:8px"><b style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(x.d)}</b><b class="neg" style="white-space:nowrap">${money(x.v)}</b></div>
+    <div class="two" style="margin-top:8px"><label class="fld" style="margin:0"><span>Nome</span><input name="ln${i}" value="${esc((ex(lid(x))||{}).name||('Empréstimo '+(i+1)+' (crédito do trabalhador)'))}" maxlength="40"></label>
+    <label class="fld" style="margin:0"><span>Parcelas que faltam</span><input name="lp${i}" type="number" min="1" max="120" inputmode="numeric" placeholder="não sei ainda" value="${left(x)}"></label></div>
+    <p class="hint" id="le${i}" style="margin:6px 0 0"></p></div>`).join(''):'<p class="hint">Este holerite não tem empréstimos.</p>'}
+  <p class="hint">Conte as parcelas incluindo a de ${MESF[+p.comp.slice(5)-1].toLowerCase()}. Se ainda não souber, deixe em branco e preencha depois em Fixas.</p>
+  <div class="row"><button type="button" class="btn ghost" data-act="close">Cancelar</button><button class="btn">Salvar</button></div></form>`);
+  const f=$('#f');const upd=()=>loans.forEach((x,i)=>{const n=parseInt(f['lp'+i].value),e=$('#le'+i);if(!e)return;
+    if(n>0){const end=addMonths(p.comp,n-1);e.innerHTML=`Última parcela em <b>${MES[+end.slice(5)-1]}/${end.slice(2,4)}</b> · ainda faltam <b>${money(r2(x.v*n))}</b>`}else e.textContent='Sem prazo definido: conta como contínuo até você informar.'});
+  f.addEventListener('input',upd);upd();
+  f.onsubmit=e=>{e.preventDefault();const sv=num(f.sv.value),sd=parseInt(f.sd.value);if(!(sv>0)||!(sd>=1&&sd<=31)){toast('Confira o valor e o dia do salário.');return}
+    const cc=ensureCfg(),put=r=>{const i=cc.recur.findIndex(y=>y.id===r.id);if(i>=0)cc.recur[i]={...cc.recur[i],...r};else cc.recur.push(r)};
+    const salCat=(cc.cats.find(x=>x.id==='salario')||cc.cats.find(x=>x.kind==='r')||{}).id;
+    put({id:salId,name:(sal&&sal.name)||'Salário',amount:r2(sv),day:sd,kind:'r',cat:salCat,acc:f.sa.value,start:(sal&&sal.start)||addMonths(p.comp,1),end:'',auto:false,vary:false,since:curM()});
+    let empCat=cc.cats.find(x=>norm2(x.name).startsWith('emprest'));if(!empCat&&loans.length){empCat={id:'emprest',name:'Empréstimos',kind:'d',color:'#c2417a'};cc.cats.push(empCat)}
+    loans.forEach((x,i)=>{const n=parseInt(f['lp'+i].value),old=ex(lid(x));
+      put({id:lid(x),name:f['ln'+i].value.trim()||('Empréstimo '+(i+1)),amount:x.v,day:sd,kind:'d',cat:empCat.id,acc:f.sa.value,start:(old&&old.start)||p.comp,end:n>0?addMonths(p.comp,n-1):'',auto:false,vary:false,payroll:true,since:curM()})});
+    save('config');closeSheet();S.tab='fixas';render();toast('Salário e '+loans.length+' empréstimo'+(loans.length===1?'':'s')+' cadastrados nas contas fixas.')}}
 
 // ================= METAS / CAIXINHAS =================
 const goalSaved=g=>r2((g.moves||[]).reduce((s,m)=>s+m.v,0));
@@ -1195,11 +1229,13 @@ function openQuick(){const c=cfg(),qs=c.quick||[];
 // ================= COMPROMISSOS FUTUROS =================
 function planData(){const c=cfg(),M=curM(),rows=[];
   for(let i=1;i<=6;i++){const k=addMonths(M,i),tx=monthTx(k).filter(t=>t.kind!=='t'&&!t.rid);
-    const fixOut=c.recur.filter(r=>r.kind!=='r'&&recActive(r,k)).map(r=>({...r,amount:r.vary?avgRec(r):r.amount})),fixIn=c.recur.filter(r=>r.kind==='r'&&recActive(r,k));
+    const fixOut=c.recur.filter(r=>r.kind!=='r'&&!r.payroll&&recActive(r,k)).map(r=>({...r,amount:r.vary?avgRec(r):r.amount})),fixIn=c.recur.filter(r=>r.kind==='r'&&recActive(r,k));
+    const freed=c.recur.filter(r=>r.payroll&&r.end&&r.end<k&&r.end>=addMonths(M,0));
     const parc=tx.filter(t=>t.kind==='d'&&t.inst),other=tx.filter(t=>t.kind==='d'&&!t.inst),inc=tx.filter(t=>t.kind==='r');
     const sp=parc.reduce((s,t)=>s+t.amt,0),sf=fixOut.reduce((s,r)=>s+(+r.amount||0),0),so=other.reduce((s,t)=>s+t.amt,0);
     const si=fixIn.reduce((s,r)=>s+(+r.amount||0),0)+inc.reduce((s,t)=>s+t.amt,0);
-    rows.push({k,sp:r2(sp),sf:r2(sf),so:r2(so),out:r2(sp+sf+so),inc:r2(si),items:[...fixOut.map(r=>({n:r.name,v:+r.amount,t:'fixa'})),...parc.map(t=>({n:t.desc,v:t.amt,t:'parcela'})),...other.map(t=>({n:t.desc||catOf(t.cat).name,v:t.amt,t:'agendado'})),...fixIn.map(r=>({n:r.name,v:+r.amount,t:'renda'})),...inc.map(t=>({n:t.desc||catOf(t.cat).name,v:t.amt,t:'renda'}))]})}
+    const fr=r2(freed.reduce((s,r)=>s+(+r.amount||0),0));
+    rows.push({k,sp:r2(sp),sf:r2(sf),so:r2(so),out:r2(sp+sf+so),inc:r2(si+fr),fr,items:[...freed.map(r=>({n:r.name+' terminou: o líquido sobe',v:+r.amount,t:'renda'})),...fixOut.map(r=>({n:r.name,v:+r.amount,t:'fixa'})),...parc.map(t=>({n:t.desc,v:t.amt,t:'parcela'})),...other.map(t=>({n:t.desc||catOf(t.cat).name,v:t.amt,t:'agendado'})),...fixIn.map(r=>({n:r.name,v:+r.amount,t:'renda'})),...inc.map(t=>({n:t.desc||catOf(t.cat).name,v:t.amt,t:'renda'}))]})}
   // parcelamentos ativos
   const g={},from=M+'-01';
   for(const t of allTx()){if(!t.inst||t.kind!=='d')continue;const n=t.inst.split('/')[1],base=String(t.desc||'').replace(/\s*\(\d+\/\d+\)\s*$/,'');
@@ -1213,7 +1249,7 @@ function vPlan(){const{rows,parcs}=planData();if(!rows.some(r=>r.out||r.inc)&&!p
   <ul class="plan">${rows.map(r=>{const free=r2(r.inc-r.out),pct=x=>(x/mx*100).toFixed(1);
     return`<li><button data-act="planRow" data-id="${r.k}" aria-expanded="${S.planOpen===r.k?'true':'false'}"><span class="mo">${mLab(r.k)}</span><b class="amt">${money(r.out)}</b><span class="fr ${r.inc?free<0?'neg':'pos':''}">${r.inc?(free<0?'falta ':'sobra ')+money(Math.abs(free)):''}</span>
     <span class="tr2" aria-hidden="true"><i style="width:${pct(r.sp)}%;background:#d9822b"></i><i style="width:${pct(r.sf)}%;background:var(--out)"></i><i style="width:${pct(r.so)}%;background:var(--mute)"></i></span>
-    <span class="sub">${[r.sp?'parcelas '+money(r.sp):'',r.sf?'fixas '+money(r.sf):'',r.so?'agendados '+money(r.so):''].filter(Boolean).join(' · ')||'nada comprometido'}${r.inc?' · renda prevista '+money(r.inc):' · sem renda prevista'}</span></button>
+    <span class="sub">${[r.sp?'parcelas '+money(r.sp):'',r.sf?'fixas '+money(r.sf):'',r.so?'agendados '+money(r.so):''].filter(Boolean).join(' · ')||'nada comprometido'}${r.inc?' · renda prevista '+money(r.inc):' · sem renda prevista'}${r.fr?` · <span class="pos">+${money(r.fr)} com fim de empréstimo</span>`:''}</span></button>
     ${S.planOpen===r.k?`<ul class="det">${r.items.map(i=>`<li><span>${esc(i.n)} <small style="color:var(--mute)">${i.t}</small></span><b class="${i.t==='renda'?'pos':''}">${i.t==='renda'?'+':'−'}${money(i.v)}</b></li>`).join('')||'<li>Nada neste mês.</li>'}</ul>`:''}</li>`}).join('')}</ul>
   <p class="legend" style="margin-top:8px;flex-wrap:wrap"><i style="background:#d9822b;margin:0"></i>Parcelas<i class="out"></i>Fixas<i style="background:var(--mute)"></i>Agendados</p>
   ${parcs.length?`<h3 style="font-size:16px;margin:18px 0 4px">Parcelamentos ativos</h3><ul class="parc txs">${parcs.map(x=>`<li><span class="t1">${esc(x.base)}</span><b>${money(x.rest)}</b><small>Faltam ${x.left} de ${x.n} × ${money(x.per)} · termina em ${MES[+x.end.slice(5)-1]}/${x.end.slice(2,4)} · ${esc(accName(x.acc))}</small></li>`).join('')}</ul>`:''}</section>`}
