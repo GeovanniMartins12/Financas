@@ -13,5 +13,5 @@ binding = "FIN"
 id = "__KV_ID__"
 
 [triggers]
-# 12:00 UTC = 9:00 em Brasília
-crons = ["0 12 * * *"]
+# 12:00 UTC = 9h em Brasília (avisos de contas); 00:00 UTC = 21h em Brasília (lembrete noturno)
+crons = ["0 12 * * *", "0 0 * * *"]

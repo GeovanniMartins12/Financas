@@ -14,7 +14,7 @@
 //   POST /api/subscribe     [auth]     {subscription, device}
 //   POST /api/unsubscribe   [auth]     {endpoint}
 //   POST /api/test          [auth]     -> push de teste (texto genérico)
-// Cron diário (9h de Brasília): envia os avisos agendados para o dia.
+// Cron diário: 9h (avisos de contas) e 21h (lembrete de lançar gastos), horário de Brasília.
 
 const TZ = 'America/Sao_Paulo';
 const enc = new TextEncoder();
@@ -132,16 +132,18 @@ export function todayIn(tz, now = new Date()) {
   const g = t => p.find(x => x.type === t).value;
   return `${g('year')}-${g('month')}-${g('day')}`;
 }
-export async function runDaily(env, now = new Date(), fetchImpl) {
+// slot '09' = avisos de contas (12:00 UTC); slot '21' = lembrete noturno (00:00 UTC = 21h do dia anterior em Brasília)
+export async function runDaily(env, now = new Date(), fetchImpl, slot = '09') {
   const today = todayIn(TZ, now);
   const sched = await getJSON(env, 'sched', { items: [] });
-  const due = (sched.items || []).filter(i => i.on === today);
+  const due = (sched.items || []).filter(i => i.on === today && (i.at || '09') === slot);
   const sentLog = await getJSON(env, 'sentlog', {});
-  if (!due.length || sentLog.last === today) return { today, due: due.length, sent: 0 };
+  const key = 'last' + slot, last = sentLog[key] || (slot === '09' ? sentLog.last : '');
+  if (!due.length || last === today) return { today, slot, due: due.length, sent: 0 };
   let sent = 0;
   for (const item of due) sent += (await pushAll(env, { iv: item.iv, c: item.c }, fetchImpl)).sent;
-  if (sent) await putJSON(env, 'sentlog', { last: today });
-  return { today, due: due.length, sent };
+  if (sent) { sentLog[key] = today; delete sentLog.last; await putJSON(env, 'sentlog', sentLog) }
+  return { today, slot, due: due.length, sent };
 }
 
 // ---------- autenticação com bloqueio por tentativas ----------
@@ -211,7 +213,7 @@ export default {
       if (p === '/api/schedule' && req.method === 'POST') {
         const { items } = await req.json();
         if (!Array.isArray(items) || items.length > 400) return J({ error: 'bad_request' }, 400);
-        const clean = items.filter(i => i && /^\d{4}-\d{2}-\d{2}$/.test(i.on) && isB64u(i.iv, 32) && isB64u(i.c, 6000)).map(i => ({ on: i.on, iv: i.iv, c: i.c }));
+        const clean = items.filter(i => i && /^\d{4}-\d{2}-\d{2}$/.test(i.on) && isB64u(i.iv, 32) && isB64u(i.c, 6000)).map(i => ({ on: i.on, at: i.at === '21' ? '21' : '09', iv: i.iv, c: i.c }));
         await putJSON(env, 'sched', { items: clean, at: Date.now() });
         return J({ ok: true, items: clean.length });
       }
@@ -236,5 +238,5 @@ export default {
       return J({ error: 'server_error' }, 500);
     }
   },
-  async scheduled(event, env, ctx) { ctx.waitUntil(runDaily(env)) }
+  async scheduled(event, env, ctx) { ctx.waitUntil(runDaily(env, new Date(), undefined, event.cron === '0 0 * * *' ? '21' : '09')) }
 };
